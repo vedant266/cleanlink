@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CleanLink</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --black: #0a0a0a;
+    --panel: #141414;
+    --mist: #cfdad9;
+    --paper: #e4e4df;
+    --ink: #161616;
+    --line: #9a9a95;
+    --grey: #7b7b7b;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    --narrow: "Archivo Narrow", "Arial Narrow", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--black); color: var(--ink); font-family: var(--mono); padding: 24px 16px 64px; }
+  .page { max-width: 1040px; margin: 0 auto; display: grid; gap: 28px; }
+  .small { font-size: 11px; letter-spacing: .02em; }
+
+  /* top band */
+  .band { background: var(--mist); padding: 18px 16px; }
+  .top { display: flex; justify-content: space-between; font-size: 13px; padding-bottom: 54px; }
+
+  .hero { color: #fff; text-align: center; padding: 110px 0 120px;
+          font-size: clamp(52px, 11vw, 120px); font-weight: 400; letter-spacing: -.03em; }
+
+  /* info band */
+  .info { display: grid; grid-template-columns: 1fr 220px; gap: 24px; }
+  .info p { font-size: 11px; line-height: 1.45; max-width: 560px; }
+  .diag { border: 1px solid var(--ink); height: 70px; position: relative; font-size: 11px;
+          background: linear-gradient(to top right, transparent calc(50% - .5px), var(--ink) 50%, transparent calc(50% + .5px)); }
+  .diag span { position: absolute; }
+  .diag .a { top: 10px; left: 12px; } .diag .b { bottom: 10px; right: 12px; }
+  .stats { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between;
+           font-size: 15px; padding-top: 28px; }
+
+  /* paper / form */
+  .paper { background: var(--paper); padding: 22px 16px 16px; position: relative; }
+  .paper h2 { font-size: 15px; font-weight: 400; padding: 0 0 120px; }
+  .badge { position: absolute; top: 18px; right: 22px; width: 120px; height: 120px; }
+  .row { border-top: 1px solid var(--line); padding: 12px 0 14px; display: grid; gap: 24px; grid-template-columns: 1fr 1fr; }
+  .row.one { grid-template-columns: 1fr; }
+  label { display: block; }
+  .field input { width: 100%; border: 0; background: none; font: 22px var(--mono); color: var(--ink); padding: 6px 0 0; outline: none; }
+  .field input::placeholder { color: #a9a9a4; }
+
+  .drop { display: flex; gap: 18px; align-items: center; margin-top: 8px; cursor: pointer; }
+  .drop input { display: none; }
+  .thumb { width: 96px; height: 72px; border: 1px solid var(--ink); flex: none; background: center/cover no-repeat;
+           display: grid; place-items: center; font-size: 22px; }
+  .drop b { font-weight: 400; font-size: 22px; }
+
+  .sizes { display: flex; gap: 28px; margin-top: 8px; flex-wrap: wrap; }
+  .sizes input { display: none; }
+  .sizes span { font-size: 22px; cursor: pointer; color: #a9a9a4; }
+  .sizes small { font-size: 11px; margin-left: 6px; }
+  .sizes input:checked + span { color: var(--ink); text-decoration: underline; text-underline-offset: 6px; }
+
+  .gps { display: none; }
+  .gps.show { display: grid; }
+
+  .submit { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--line); padding-top: 14px; }
+  .submit button { background: var(--ink); color: var(--paper); border: 0; font: 15px var(--mono); padding: 14px 22px; cursor: pointer; }
+  .submit button:disabled { opacity: .5; cursor: wait; }
+  .msg { font-size: 13px; max-width: 60%; }
+
+  /* spots list */
+  .spots { background: var(--panel); border-radius: 18px; padding: 40px 28px 36px; color: #fff;
+           display: grid; grid-template-columns: 22px minmax(0, 1fr) 300px; gap: 28px; }
+  .spots h2 { grid-column: 1 / -1; font: 400 13px var(--mono); color: var(--grey); }
+  .index { font: 700 9px var(--narrow); color: #bbb; display: grid; align-content: start; }
+  .index span { line-height: calc(20px * 1.32); }
+  .list { font-family: var(--narrow); font-size: 20px; line-height: 1.32; list-style: none; padding: 0; }
+  .list li { font-weight: 700; color: #cfcfcf; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list li em { font-style: normal; font-weight: 400; color: var(--grey); }
+  .list li:hover, .list li.on { color: #fff; }
+  .empty { font-family: var(--narrow); font-size: 20px; color: var(--grey); }
+  .detail img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: #222; }
+  .detail dl { font-size: 12px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin-top: 14px; }
+  .detail dt { color: var(--grey); }
+
+  @media (max-width: 760px) {
+    .info, .row { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .hero { padding: 70px 0 80px; }
+    .badge { width: 84px; height: 84px; }
+    .spots { grid-template-columns: 1fr; padding: 28px 18px; }
+    .index { display: none; }
+    .msg { max-width: 55%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div>
+    <div class="band">
+      <div class="top"><span>CleanLink</span><span>&rarr;</span><span>&rarr;&nbsp; Community cleanup</span></div>
+    </div>
+    <h1 class="hero">cleanlink</h1>
+    <div class="band">
+      <div class="info">
+        <p>Report a waste spot by uploading a photo. The location is read from the photo's GPS data
+           and turned into a city and locality. Each spot is sized, and the size decides how many
+           local workers the cleanup needs: small 2, medium 5, large 10.</p>
+        <div class="diag"><span class="a">REPORT</span><span class="b">CLEAN</span></div>
+      </div>
+      <div class="stats">
+        <span id="count">0 spots</span><span id="cities">0 cities</span><span>Ver 1.0</span><span>(Ready)</span>
+      </div>
+    </div>
+  </div>
+
+  <form class="paper" id="form">
+    <svg class="badge" viewBox="0 0 120 120" aria-hidden="true">
+      <defs><path id="ring" d="M60,60 m-44,0 a44,44 0 1,1 88,0 a44,44 0 1,1 -88,0"/></defs>
+      <circle cx="60" cy="60" r="30" fill="none" stroke="#161616" stroke-width=".8"/>
+      <text font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.6">
+        <textPath href="#ring">CLEANLINK · REPORT A SPOT · </textPath>
+      </text>
+    </svg>
+
+    <h2>Report a waste spot</h2>
+
+    <div class="row one">
+      <label class="small">Photo
+        <span class="drop">
+          <input type="file" name="photo" id="photo" accept="image/jpeg,image/*">
+          <span class="thumb" id="thumb">+</span>
+          <b id="photoName">Upload photo</b>
+        </span>
+      </label>
+    </div>
+
+    <div class="row">
+      <label class="small field">Reporter ID
+        <input name="reporterID" type="number" min="1" placeholder="101" required>
+      </label>
+      <label class="small field">Waste type
+        <input name="wasteType" placeholder="plastic" required>
+      </label>
+    </div>
+
+    <div class="row one">
+      <div class="small">Size / workers needed
+        <div class="sizes">
+          <label><input type="radio" name="size" value="0" required><span>Small<small>2</small></span></label>
+          <label><input type="radio" name="size" value="1"><span>Medium<small>5</small></span></label>
+          <label><input type="radio" name="size" value="2"><span>Large<small>10</small></span></label>
+        </div>
+      </div>
+    </div>
+
+    <div class="row gps" id="gps">
+      <label class="small field">Latitude (photo had no GPS)
+        <input name="latitude" type="number" step="any" placeholder="19.0760">
+      </label>
+      <label class="small field">Longitude
+        <input name="longitude" type="number" step="any" placeholder="72.8777">
+      </label>
+    </div>
+
+    <div class="submit">
+      <span class="msg" id="msg"></span>
+      <button id="send">Report spot &rarr;</button>
+    </div>
+  </form>
+
+  <section class="spots">
+    <h2>Waste spots</h2>
+    <div class="index" id="index"></div>
+    <div>
+      <ul class="list" id="list"></ul>
+    </div>
+    <div class="detail" id="detail"></div>
+  </section>
+
+</div>
+
+<script>
+  const form = document.getElementById('form');
+  const photo = document.getElementById('photo');
+  const msg = document.getElementById('msg');
+  const send = document.getElementById('send');
+  let spots = [];
+
+  photo.addEventListener('change', () => {
+    const file = photo.files[0];
+    if (!file) return;
+    document.getElementById('photoName').textContent = file.name;
+    const thumb = document.getElementById('thumb');
+    thumb.style.backgroundImage = `url(${URL.createObjectURL(file)})`;
+    thumb.textContent = '';
+    document.getElementById('gps').classList.remove('show');
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!photo.files[0]) { msg.textContent = 'Upload a photo first.'; return; }
+
+    send.disabled = true;
+    msg.textContent = 'Reading location…';
+
+    try {
+      const res = await fetch('/api/report', { method: 'POST', body: new FormData(form) });
+      const data = await res.json();
+
+      if (!res.ok) {
+        msg.textContent = data.error;
+        if (data.error.includes('GPS')) document.getElementById('gps').classList.add('show');
+        return;
+      }
+
+      msg.textContent = `Spot #${data.id} reported: ${data.city || 'unknown city'}, ${data.locality || '—'}`;
+      form.reset();
+      document.getElementById('thumb').style.backgroundImage = '';
+      document.getElementById('thumb').textContent = '+';
+      document.getElementById('photoName').textContent = 'Upload photo';
+      document.getElementById('gps').classList.remove('show');
+      await load(data.id);
+    } catch {
+      msg.textContent = 'Could not reach the server. Is it running?';
+    } finally {
+      send.disabled = false;
+    }
+  });
+
+  function show(id) {
+    const s = spots.find(x => x.id === id);
+    if (!s) return;
+    document.querySelectorAll('.list li').forEach(li => li.classList.toggle('on', +li.dataset.id === id));
+    document.getElementById('detail').innerHTML = `
+      <img src="/api/photo/${s.id}" alt="">
+      <dl>
+        <dt>Spot</dt><dd>#${s.id}</dd>
+        <dt>Where</dt><dd>${s.city || '—'}, ${s.locality || '—'}</dd>
+        <dt>GPS</dt><dd>${s.latitude.toFixed(4)}, ${s.longitude.toFixed(4)}</dd>
+        <dt>Waste</dt><dd>${s.wasteType}</dd>
+        <dt>Size</dt><dd>${s.size}, ${s.workersNeeded} workers</dd>
+        <dt>Status</dt><dd>${s.status}</dd>
+        <dt>Reporter</dt><dd>${s.reporterID}</dd>
+      </dl>`;
+  }
+
+  async function load(selectId) {
+    spots = await (await fetch('/api/spots')).json();
+    const list = document.getElementById('list');
+
+    document.getElementById('count').textContent = `${spots.length} spot${spots.length === 1 ? '' : 's'}`;
+    const cities = new Set(spots.map(s => s.city).filter(Boolean)).size;
+    document.getElementById('cities').textContent = `${cities} cit${cities === 1 ? 'y' : 'ies'}`;
+    document.getElementById('index').innerHTML = spots.map(s => `<span>${s.id}</span>`).join('');
+
+    if (!spots.length) {
+      list.innerHTML = '<li class="empty">No spots reported yet.</li>';
+      return;
+    }
+
+    list.innerHTML = spots.map(s =>
+      `<li data-id="${s.id}">${s.city || 'Unknown'}, ${s.locality || '—'} <em>(${s.wasteType}, ${s.size.toLowerCase()})</em></li>`
+    ).join('');
+    list.querySelectorAll('li').forEach(li => li.addEventListener('click', () => show(+li.dataset.id)));
+    show(selectId || spots[spots.length - 1].id);
+  }
+
+  load();
+</script>
+</body>
+</html>
