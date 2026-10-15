@@ -1,4 +1,5 @@
 #include "../api/reverse_geocode.h"
+#include "../api/photo_location.h"
 #include "../include/report_spot.h"
 #include <iostream>
 #include <cstring>
@@ -22,11 +23,23 @@ void ReportSpot::reportSpot(SpotList &spots)
     cout << "Enter Reporter ID: ";
     cin >> reporterID;
 
-    cout << "Enter Latitude: ";
-    cin >> latitude;
+    cout << "Enter Photo Path: ";
+    cin >> photoPath;
 
-    cout << "Enter Longitude: ";
-    cin >> longitude;
+    if (getPhotoLocation(photoPath, latitude, longitude))
+    {
+        cout << "GPS found in photo: " << latitude << ", " << longitude << endl;
+    }
+    else
+    {
+        cout << "No GPS in photo. Enter location manually.\n";
+
+        cout << "Enter Latitude: ";
+        cin >> latitude;
+
+        cout << "Enter Longitude: ";
+        cin >> longitude;
+    }
 
     Location location = reverseGeocode(latitude, longitude);
     cout << "\nLocation found:\n";
@@ -43,9 +56,6 @@ void ReportSpot::reportSpot(SpotList &spots)
     {
         cout << "City already exists in City Hash Table.\n";
     }
-
-    cout << "Enter Photo Path: ";
-    cin >> photoPath;
 
     cout << "Enter Waste Type: ";
     cin >> wasteType;
