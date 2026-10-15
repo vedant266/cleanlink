@@ -12,3 +12,7 @@ backend/main
 .DS_Store
 .vscode/
 .idea/
+
+# Web app
+/cleanlink-web
+uploads/
