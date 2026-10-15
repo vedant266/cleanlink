@@ -1,27 +1,46 @@
 #ifndef LOCALITY_HASH_H
 #define LOCALITY_HASH_H
 
+#include <iostream>
 #include <string>
 using namespace std;
 
-const int SIZE = 10;
+#define SIZE 10
+
+struct WasteSpot;
 
 struct Locality
 {
     int id;
     string name;
+
+    double minLat;
+    double maxLat;
+    double minLon;
+    double maxLon;
+
+    WasteSpot* head;
 };
 
 class LocalityHashTable
 {
 private:
     Locality table[SIZE];
+    int nextLocalityID;
+
+    int hashFunction(string name);
 
 public:
-    int hashFunction(string name);
-    void insertLocality(int id, string name);
+    LocalityHashTable();
+
     int searchLocality(string name);
-    void display();
+
+    void insertLocality(string name,
+                        double minLat,
+                        double maxLat,
+                        double minLon,
+                        double maxLon,
+                        WasteSpot* head = nullptr);
 };
 
 #endif
