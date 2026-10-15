@@ -26,6 +26,8 @@ public:
     int addSpot(WasteSpot spot);
 
     void display();
+
+    WasteSpot *getHead() { return head; }
 };
 
 #endif

@@ -12,6 +12,11 @@ private:
 
 public:
     void reportSpot(SpotList &spots);
+
+    int saveReport(SpotList &spots, int reporterID,
+                   double latitude, double longitude,
+                   const char *photoPath, const char *wasteType,
+                   WasteSize estimatedSize);
 };
 
 #endif

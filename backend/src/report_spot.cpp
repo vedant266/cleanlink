@@ -41,22 +41,6 @@ void ReportSpot::reportSpot(SpotList &spots)
         cin >> longitude;
     }
 
-    Location location = reverseGeocode(latitude, longitude);
-    cout << "\nLocation found:\n";
-    cout << "City: " << location.cityName << endl;
-    cout << "Locality: " << location.localityName << endl;
-
-    int cityIndex = cityTable.searchCity(location.cityName);
-
-    if (cityIndex == -1)
-    {
-        cityTable.insertCity(location.cityName);
-    }
-    else
-    {
-        cout << "City already exists in City Hash Table.\n";
-    }
-
     cout << "Enter Waste Type: ";
     cin >> wasteType;
 
@@ -85,6 +69,34 @@ void ReportSpot::reportSpot(SpotList &spots)
         return;
     }
 
+    int spotID = saveReport(spots, reporterID, latitude, longitude,
+                            photoPath, wasteType, estimatedSize);
+
+    cout << "\nWaste spot #" << spotID << " reported successfully!\n";
+}
+
+// Shared by the terminal menu and the web server
+int ReportSpot::saveReport(SpotList &spots, int reporterID,
+                           double latitude, double longitude,
+                           const char *photoPath, const char *wasteType,
+                           WasteSize estimatedSize)
+{
+    Location location = reverseGeocode(latitude, longitude);
+    cout << "\nLocation found:\n";
+    cout << "City: " << location.cityName << endl;
+    cout << "Locality: " << location.localityName << endl;
+
+    int cityIndex = cityTable.searchCity(location.cityName);
+
+    if (cityIndex == -1)
+    {
+        cityTable.insertCity(location.cityName);
+    }
+    else
+    {
+        cout << "City already exists in City Hash Table.\n";
+    }
+
     WasteSpot spot = {};
 
     spot.reporterID = reporterID;
@@ -94,8 +106,8 @@ void ReportSpot::reportSpot(SpotList &spots)
     strncpy(spot.cityName, location.cityName.c_str(), sizeof(spot.cityName) - 1);
     strncpy(spot.localityName, location.localityName.c_str(), sizeof(spot.localityName) - 1);
 
-    strcpy(spot.photoPath, photoPath);
-    strcpy(spot.wasteType, wasteType);
+    strncpy(spot.photoPath, photoPath, sizeof(spot.photoPath) - 1);
+    strncpy(spot.wasteType, wasteType, sizeof(spot.wasteType) - 1);
 
     spot.estimatedSize = estimatedSize;
     spot.status = PENDING;
@@ -117,7 +129,5 @@ void ReportSpot::reportSpot(SpotList &spots)
         spot.workerLimit = 10;
     }
 
-    int spotID = spots.addSpot(spot);
-
-    cout << "\nWaste spot #" << spotID << " reported successfully!\n";
+    return spots.addSpot(spot);
 }
