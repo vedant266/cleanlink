@@ -82,19 +82,32 @@ int ReportSpot::saveReport(SpotList &spots, int reporterID,
                            WasteSize estimatedSize)
 {
     Location location = reverseGeocode(latitude, longitude);
+
+    // Never save a blank city or locality
+    bool cityKnown = !location.cityName.empty();
+
+    if (!cityKnown)
+        location.cityName = "Unknown";
+
+    if (location.localityName.empty())
+        location.localityName = location.cityName;
+
     cout << "\nLocation found:\n";
     cout << "City: " << location.cityName << endl;
     cout << "Locality: " << location.localityName << endl;
 
-    int cityIndex = cityTable.searchCity(location.cityName);
+    if (cityKnown)
+    {
+        int cityIndex = cityTable.searchCity(location.cityName);
 
-    if (cityIndex == -1)
-    {
-        cityTable.insertCity(location.cityName);
-    }
-    else
-    {
-        cout << "City already exists in City Hash Table.\n";
+        if (cityIndex == -1)
+        {
+            cityTable.insertCity(location.cityName);
+        }
+        else
+        {
+            cout << "City already exists in City Hash Table.\n";
+        }
     }
 
     WasteSpot spot = {};

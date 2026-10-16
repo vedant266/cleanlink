@@ -108,8 +108,22 @@ int main(int argc, char *argv[])
                 return sendError(res, "No GPS in this photo. Enter latitude and longitude.");
             }
 
-            latitude = std::stod(lat);
-            longitude = std::stod(lon);
+            try
+            {
+                latitude = std::stod(lat);
+                longitude = std::stod(lon);
+            }
+            catch (const std::exception &)
+            {
+                remove(photoPath.c_str());
+                return sendError(res, "Latitude and longitude must be numbers.");
+            }
+        }
+
+        if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180)
+        {
+            remove(photoPath.c_str());
+            return sendError(res, "Latitude must be -90 to 90 and longitude -180 to 180.");
         }
 
         std::lock_guard<std::mutex> guard(spotsLock);
