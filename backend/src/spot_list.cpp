@@ -125,6 +125,9 @@ void SpotList::display()
         cout << "Reporter ID: " << current->reporterID << endl;
         cout << "Location: " << current->latitude
              << ", " << current->longitude << endl;
+        // %.6f keeps 6 decimals so the pin lands on the exact spot
+        printf("Map: https://www.google.com/maps?q=%.6f,%.6f\n",
+               current->latitude, current->longitude);
         cout << "City: " << current->cityName << endl;
         cout << "Locality: " << current->localityName << endl;
         cout << "Waste Type: " << current->wasteType << endl;
