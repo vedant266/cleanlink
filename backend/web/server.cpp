@@ -6,6 +6,7 @@
 #include <iostream>
 #include <mutex>
 #include <ctime>
+#include <cstdlib>
 #include <fstream>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -158,8 +159,14 @@ int main(int argc, char *argv[])
 
     server.set_mount_point("/", "frontend");
 
-    std::cout << "CleanLink running at http://localhost:" << PORT << std::endl;
-    server.listen("localhost", PORT);
+    // Render (or any host) tells us which port to use through the PORT variable
+    int port = PORT;
+    if (getenv("PORT"))
+        port = atoi(getenv("PORT"));
+
+    // 0.0.0.0 = accept visitors from outside this computer, not just localhost
+    std::cout << "CleanLink running at http://localhost:" << port << std::endl;
+    server.listen("0.0.0.0", port);
 
     return 0;
 }
