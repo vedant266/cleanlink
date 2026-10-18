@@ -84,9 +84,7 @@ int ReportSpot::saveReport(SpotList &spots, int reporterID,
     Location location = reverseGeocode(latitude, longitude);
 
     // Never save a blank city or locality
-    bool cityKnown = !location.cityName.empty();
-
-    if (!cityKnown)
+    if (location.cityName.empty())
         location.cityName = "Unknown";
 
     if (location.localityName.empty())
@@ -95,20 +93,6 @@ int ReportSpot::saveReport(SpotList &spots, int reporterID,
     cout << "\nLocation found:\n";
     cout << "City: " << location.cityName << endl;
     cout << "Locality: " << location.localityName << endl;
-
-    if (cityKnown)
-    {
-        int cityIndex = cityTable.searchCity(location.cityName);
-
-        if (cityIndex == -1)
-        {
-            cityTable.insertCity(location.cityName);
-        }
-        else
-        {
-            cout << "City already exists in City Hash Table.\n";
-        }
-    }
 
     WasteSpot spot = {};
 
@@ -142,5 +126,21 @@ int ReportSpot::saveReport(SpotList &spots, int reporterID,
         spot.workerLimit = 10;
     }
 
-    return spots.addSpot(spot);
+    int spotID = spots.addSpot(spot);
+
+    // The new node is at the end of SpotList; file it under its city and locality
+    cityTable.addSpot(spots.getTail());
+
+    return spotID;
+}
+
+void ReportSpot::loadTables(SpotList &spots)
+{
+    for (WasteSpot *s = spots.getHead(); s != nullptr; s = s->next)
+        cityTable.addSpot(s);
+}
+
+void ReportSpot::displayTables()
+{
+    cityTable.display();
 }

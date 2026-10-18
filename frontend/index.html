@@ -73,14 +73,19 @@
 
   /* spots list */
   .spots { background: var(--panel); border-radius: 18px; padding: 40px 28px 36px; color: #fff;
-           display: grid; grid-template-columns: 22px minmax(0, 1fr) 300px; gap: 28px; }
+           display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 28px; }
   .spots h2 { grid-column: 1 / -1; font: 400 13px var(--mono); color: var(--grey); }
-  .index { font: 700 9px var(--narrow); color: #bbb; display: grid; align-content: start; }
-  .index span { line-height: calc(20px * 1.32); }
   .list { font-family: var(--narrow); font-size: 20px; line-height: 1.32; list-style: none; padding: 0; }
-  .list li { font-weight: 700; color: #cfcfcf; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list li { font-weight: 700; color: #cfcfcf; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .list li em { font-style: normal; font-weight: 400; color: var(--grey); }
-  .list li:hover, .list li.on { color: #fff; }
+  /* city -> locality -> spot */
+  .list li.city { color: #fff; font-size: 24px; margin-top: 22px; }
+  .list li.city:first-child { margin-top: 0; }
+  .list li.city em { font: 400 11px var(--mono); margin-left: 6px; }
+  .list li.loc { font-size: 15px; font-weight: 400; color: var(--mist); padding-left: 16px; margin-top: 6px; }
+  .list li.loc em { font: 400 11px var(--mono); }
+  .list li.spot { font-size: 18px; padding-left: 32px; cursor: pointer; }
+  .list li.spot:hover, .list li.spot.on { color: #fff; }
   .empty { font-family: var(--narrow); font-size: 20px; color: var(--grey); }
   .detail img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: #222; }
   .detail dl { font-size: 12px; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin-top: 14px; }
@@ -93,7 +98,6 @@
     .hero { padding: 70px 0 80px; }
     .badge { width: 84px; height: 84px; }
     .spots { grid-template-columns: 1fr; padding: 28px 18px; }
-    .index { display: none; }
     .msg { max-width: 55%; }
   }
 </style>
@@ -176,7 +180,6 @@
 
   <section class="spots">
     <h2>Waste spots</h2>
-    <div class="index" id="index"></div>
     <div>
       <ul class="list" id="list"></ul>
     </div>
@@ -262,17 +265,42 @@
     document.getElementById('count').textContent = `${spots.length} spot${spots.length === 1 ? '' : 's'}`;
     const cities = new Set(spots.map(s => s.city).filter(Boolean)).size;
     document.getElementById('cities').textContent = `${cities} cit${cities === 1 ? 'y' : 'ies'}`;
-    document.getElementById('index').innerHTML = spots.map(s => `<span>${s.id}</span>`).join('');
-
     if (!spots.length) {
       list.innerHTML = '<li class="empty">No spots reported yet.</li>';
       return;
     }
 
-    list.innerHTML = spots.map(s =>
-      `<li data-id="${s.id}">${s.city || 'Unknown'}, ${s.locality || '—'} <em>(${s.wasteType}, ${s.size.toLowerCase()})</em></li>`
-    ).join('');
-    list.querySelectorAll('li').forEach(li => li.addEventListener('click', () => show(+li.dataset.id)));
+    // Group spots: city -> locality -> spots
+    const groups = new Map();
+    for (const s of spots) {
+      const city = s.city || 'Unknown';
+      const locality = s.locality || 'Unknown';
+      if (!groups.has(city)) groups.set(city, new Map());
+      const localities = groups.get(city);
+      if (!localities.has(locality)) localities.set(locality, []);
+      localities.get(locality).push(s);
+    }
+
+    // A–Z, with "Unknown" last
+    const byName = (a, b) => (a === 'Unknown') - (b === 'Unknown') || a.localeCompare(b);
+
+    let html = '';
+    for (const city of [...groups.keys()].sort(byName)) {
+      const localities = groups.get(city);
+      const spotCount = [...localities.values()].reduce((n, l) => n + l.length, 0);
+      html += `<li class="city">${city} <em>${localities.size} localit${localities.size === 1 ? 'y' : 'ies'} · ${spotCount} spot${spotCount === 1 ? '' : 's'}</em></li>`;
+
+      for (const locality of [...localities.keys()].sort(byName)) {
+        const items = localities.get(locality);
+        html += `<li class="loc">${locality} <em>${items.length}</em></li>`;
+        html += items.map(s =>
+          `<li class="spot" data-id="${s.id}">#${s.id} ${s.wasteType} <em>(${s.size.toLowerCase()})</em></li>`
+        ).join('');
+      }
+    }
+
+    list.innerHTML = html;
+    list.querySelectorAll('li[data-id]').forEach(li => li.addEventListener('click', () => show(+li.dataset.id)));
     show(selectId || spots[spots.length - 1].id);
   }
 

@@ -28,6 +28,8 @@ public:
     void display();
 
     WasteSpot *getHead() { return head; }
+
+    WasteSpot *getTail() { return tail; }
 };
 
 #endif

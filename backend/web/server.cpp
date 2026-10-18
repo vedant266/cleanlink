@@ -60,6 +60,7 @@ int main(int argc, char *argv[])
 
     mkdir(UPLOAD_DIR, 0755);
     spots.loadFromFile();
+    report.loadTables(spots);
 
     httplib::Server server;
 

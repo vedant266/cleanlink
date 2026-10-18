@@ -11,6 +11,11 @@ private:
     CityHashTable cityTable;
 
 public:
+    // File every spot already saved in the .dat file under its city and locality
+    void loadTables(SpotList &spots);
+
+    void displayTables();
+
     void reportSpot(SpotList &spots);
 
     int saveReport(SpotList &spots, int reporterID,

@@ -11,6 +11,7 @@ void showMenu() {
     cout << "4. Donate\n";
     cout << "5. View Jobs\n";
     cout << "6. Exit\n";
+    cout << "7. View City / Locality Tables\n";
     cout << "Enter choice: ";
 }
 
@@ -20,6 +21,7 @@ int main() {
     SpotList spots;
 
     spots.loadFromFile();
+    report.loadTables(spots);
 
     do {
         showMenu();
@@ -49,6 +51,10 @@ int main() {
 
             case 6:
                 cout << "Exiting...\n";
+                break;
+
+            case 7:
+                report.displayTables();
                 break;
 
             default:
