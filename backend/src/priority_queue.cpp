@@ -31,21 +31,21 @@ void PriorityQueue::swap(Applicant *&a, Applicant *&b)
 bool PriorityQueue::higherPriority(Applicant *a, Applicant *b)
 {
     // 1. Smaller distance = higher priority
-    if (a->distance < b->distance)
+    if (a->getDistance() < b->getDistance())
         return true;
 
-    if (a->distance > b->distance)
+    if (a->getDistance() > b->getDistance())
         return false;
 
     // 2. Higher rating = higher priority
-    if (a->workerRating > b->workerRating)
+    if (a->getWorkerRating() > b->getWorkerRating())
         return true;
 
-    if (a->workerRating < b->workerRating)
+    if (a->getWorkerRating() < b->getWorkerRating())
         return false;
 
     // 3. Earlier application = higher priority
-    return a->applicationTime < b->applicationTime;
+    return a->getApplicationTime() < b->getApplicationTime();
 }
 
 void PriorityQueue::heapifyUp(int index)

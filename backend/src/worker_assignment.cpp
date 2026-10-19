@@ -51,17 +51,8 @@ void applyForSpot(
         return;
     }
 
-    Applicant *newApplicant = new Applicant;
-
-    newApplicant->workerID = workerID;
-
-    newApplicant->workerLatitude = workerLatitude;
-    newApplicant->workerLongitude = workerLongitude;
-
-    newApplicant->workerRating = workerRating;
-
     // Calculate distance between worker and waste spot
-    newApplicant->distance = calculateDistance(
+    double distance = calculateDistance(
         spot->latitude,
         spot->longitude,
         workerLatitude,
@@ -71,10 +62,17 @@ void applyForSpot(
     // Simple increasing application time
     static long long applicationCounter = 1;
 
-    newApplicant->applicationTime = applicationCounter++;
+    Applicant *newApplicant = new Applicant(
+        workerID,
+        workerLatitude,
+        workerLongitude,
+        workerRating,
+        distance,
+        applicationCounter++
+    );
 
     // Insert at beginning of linked list
-    newApplicant->next = spot->applicantHead;
+    newApplicant->setNext(spot->applicantHead);
 
     spot->applicantHead = newApplicant;
 
@@ -82,7 +80,7 @@ void applyForSpot(
          << " applied for Spot " << spot->spotID << endl;
 
     cout << "Distance: "
-         << newApplicant->distance
+         << newApplicant->getDistance()
          << " km" << endl;
 }
 
@@ -107,21 +105,21 @@ void displayApplicants(WasteSpot *spot)
     while (current != nullptr)
     {
         cout << "Worker ID: "
-             << current->workerID << endl;
+             << current->getWorkerID() << endl;
 
         cout << "Distance: "
-             << current->distance
+             << current->getDistance()
              << " km" << endl;
 
         cout << "Rating: "
-             << current->workerRating << endl;
+             << current->getWorkerRating() << endl;
 
         cout << "Application Time: "
-             << current->applicationTime << endl;
+             << current->getApplicationTime() << endl;
 
         cout << "------------------\n";
 
-        current = current->next;
+        current = current->getNext();
     }
 }
 
@@ -142,7 +140,7 @@ void assignWorkers(WasteSpot *spot)
     {
         pq.push(current);
 
-        current = current->next;
+        current = current->getNext();
     }
 
     spot->assignedCount = 0;
@@ -157,17 +155,17 @@ void assignWorkers(WasteSpot *spot)
         Applicant *selected = pq.pop();
 
         spot->assignedWorkers[spot->assignedCount] =
-            selected->workerID;
+            selected->getWorkerID();
 
         cout << "Selected Worker: "
-             << selected->workerID << endl;
+             << selected->getWorkerID() << endl;
 
         cout << "Distance: "
-             << selected->distance
+             << selected->getDistance()
              << " km" << endl;
 
         cout << "Rating: "
-             << selected->workerRating << endl;
+             << selected->getWorkerRating() << endl;
 
         cout << "------------------\n";
 
