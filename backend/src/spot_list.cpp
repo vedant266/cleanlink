@@ -18,8 +18,20 @@ SpotList::~SpotList()
     {
         WasteSpot *temp = head;
         head = head->next;
+
+        // Free this spot's applicant list before freeing the spot
+        Applicant *applicant = temp->applicantHead;
+        while (applicant != nullptr)
+        {
+            Applicant *nextApplicant = applicant->getNext();
+            delete applicant;
+            applicant = nextApplicant;
+        }
+
         delete temp;
     }
+
+    tail = nullptr;
 }
 
 // Copy the spot into a new node at the end of the linked list
