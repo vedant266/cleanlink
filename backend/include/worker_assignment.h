@@ -2,6 +2,7 @@
 #define WORKER_ASSIGNMENT_H
 
 #include "waste_spot.h"
+#include "user.h"
 
 double calculateDistance(
     double lat1,
@@ -10,13 +11,7 @@ double calculateDistance(
     double lon2
 );
 
-void applyForSpot(
-    WasteSpot *spot,
-    int workerID,
-    double workerLatitude,
-    double workerLongitude,
-    double workerRating
-);
+void applyForSpot(WasteSpot *spot, const Worker &worker);
 
 void displayApplicants(WasteSpot *spot);
 
