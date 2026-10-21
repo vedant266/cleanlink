@@ -2,6 +2,7 @@
 #include "../api/photo_location.h"
 #include "../include/report_spot.h"
 #include "user.h"
+#include "location_source.h"
 #include <iostream>
 #include <cstring>
 
@@ -27,19 +28,17 @@ void ReportSpot::reportSpot(SpotList &spots)
     cout << "Enter Photo Path: ";
     cin >> photoPath;
 
-    if (getPhotoLocation(photoPath, latitude, longitude))
-    {
-        cout << "GPS found in photo: " << latitude << ", " << longitude << endl;
-    }
-    else
-    {
-        cout << "No GPS in photo. Enter location manually.\n";
+    PhotoLocationSource photoSource;
+    ManualLocationSource manualSource;
 
-        cout << "Enter Latitude: ";
-        cin >> latitude;
+    // Try the photo first, and fall back to manual entry if it has no GPS.
+    // The pointer can point to either kind of source (polymorphism).
+    LocationSource *source = &photoSource;
 
-        cout << "Enter Longitude: ";
-        cin >> longitude;
+    if (!source->getLocation(photoPath, latitude, longitude))
+    {
+        source = &manualSource;
+        source->getLocation(photoPath, latitude, longitude);
     }
 
     cout << "Enter Waste Type: ";
