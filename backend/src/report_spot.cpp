@@ -1,6 +1,7 @@
 #include "../api/reverse_geocode.h"
 #include "../api/photo_location.h"
 #include "../include/report_spot.h"
+#include "user.h"
 #include <iostream>
 #include <cstring>
 
@@ -69,7 +70,9 @@ void ReportSpot::reportSpot(SpotList &spots)
         return;
     }
 
-    int spotID = saveReport(spots, reporterID, latitude, longitude,
+    Reporter reporter(reporterID);
+
+    int spotID = saveReport(spots, reporter.getID(), latitude, longitude,
                             photoPath, wasteType, estimatedSize);
 
     cout << "\nWaste spot #" << spotID << " reported successfully!\n";
