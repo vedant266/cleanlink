@@ -74,7 +74,7 @@ int CityHashTable::searchCity(string name)
         if(table[index].name == name)
             return index;
 
-        index = (index + 1) % CITY_SIZE;
+        index = (index + 1) % CITY_SIZE; //linear probing
 
         // Prevent infinite loop if table is full
         if(index == startIndex)
@@ -114,7 +114,7 @@ Locality* CityHashTable::addLocality(string cityName, string localityName)
     if(city == nullptr)
         return nullptr;
 
-    return city->localities.insertLocality(localityName);
+    return city->localities.insertLocality(localityName);//into this city table
 }
 
 void CityHashTable::addSpot(WasteSpot* spot)

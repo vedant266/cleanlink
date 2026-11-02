@@ -19,13 +19,13 @@ struct City
 class CityHashTable
 {
 private:
-    City table[CITY_SIZE];
+    City table[CITY_SIZE];//array
     int nextCityID;
 
 public:
-    CityHashTable();
+    CityHashTable(); //constructor insialises all the slot
 
-    int hashFunction(string name);
+    int hashFunction(string name);//adds up the character codes of city
 
     // Adds the city if it is new. Returns nullptr if the table is full.
     City* insertCity(string name);
