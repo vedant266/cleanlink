@@ -37,3 +37,11 @@ double Worker::getRating() const
 {
     return rating;
 }
+
+Moderator::Moderator(int moderatorID) : User(moderatorID)
+{
+}
+
+Donor::Donor(int donorID) : User(donorID)
+{
+}

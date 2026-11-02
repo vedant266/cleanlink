@@ -37,4 +37,18 @@ public:
     double getRating() const;
 };
 
+// A person who checks a report before it can be funded
+class Moderator : public User
+{
+public:
+    Moderator(int moderatorID);
+};
+
+// A person or organisation that donates money to clean a verified spot
+class Donor : public User
+{
+public:
+    Donor(int donorID);
+};
+
 #endif
