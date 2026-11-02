@@ -1,6 +1,8 @@
 #include <iostream>
 #include "report_spot.h"
 #include "spot_list.h"
+#include "funding.h"
+#include "verification.h"
 using namespace std;
 
 void showMenu() {
@@ -12,6 +14,8 @@ void showMenu() {
     cout << "5. View Jobs\n";
     cout << "6. Exit\n";
     cout << "7. View City / Locality Tables\n";
+    cout << "8. View Donations\n";
+    cout << "9. Verify Spot (Moderator)\n";
     cout << "Enter choice: ";
 }
 
@@ -19,9 +23,12 @@ int main() {
     int choice;
     ReportSpot report;
     SpotList spots;
+    Funding funding;
+    Verification verification;
 
     spots.loadFromFile();
     report.loadTables(spots);
+    funding.loadFromFile();
 
     do {
         showMenu();
@@ -38,11 +45,11 @@ int main() {
                 break;
 
             case 3:
-                cout << "View Campaigns\n";
+                funding.displayCampaigns(spots);
                 break;
 
             case 4:
-                cout << "Donate\n";
+                funding.fundSpotMenu(report.getCityTable(), spots);
                 break;
 
             case 5:
@@ -55,6 +62,14 @@ int main() {
 
             case 7:
                 report.displayTables();
+                break;
+
+            case 8:
+                funding.displayDonations();
+                break;
+
+            case 9:
+                verification.verifySpotMenu(spots, report.getCityTable());
                 break;
 
             default:
