@@ -27,7 +27,7 @@ std::mutex spotsLock; // one report at a time
 json spotToJson(const WasteSpot *spot)
 {
     const char *sizeNames[] = {"Small", "Medium", "Large"};
-    const char *statusNames[] = {"Pending", "Verified", "Funded", "Assigned", "Completed"};
+    const char *statusNames[] = {"Pending", "Verified", "Funded", "Assigned", "Completed", "Rejected"};
 
     return {
         {"id", spot->spotID},
