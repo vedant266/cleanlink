@@ -91,6 +91,20 @@ void SpotList::loadFromFile()
         return;
     }
 
+    // Every record is the same size. If the file doesn't divide evenly, it was
+    // saved before WasteSpot changed, and reading it would give garbage.
+    fseek(fp, 0, SEEK_END);
+    long fileSize = ftell(fp);
+    rewind(fp);
+
+    if (fileSize % sizeof(WasteSpot) != 0)
+    {
+        cout << SPOT_FILE << " was saved by an older version of CleanLink.\n"
+             << "Delete or rename it to start fresh.\n";
+        fclose(fp);
+        return;
+    }
+
     WasteSpot spot;
     int count = 0;
 
@@ -116,10 +130,56 @@ int SpotList::addSpot(WasteSpot spot)
     return spot.spotID;
 }
 
+// Records are a fixed size, so find the spot's record and write over it
+bool SpotList::updateSpot(const WasteSpot &spot)
+{
+    FILE *fp = fopen(SPOT_FILE, "r+b");
+
+    if (fp == NULL)
+    {
+        cout << "Error opening " << SPOT_FILE << endl;
+        return false;
+    }
+
+    WasteSpot record;
+
+    while (fread(&record, sizeof(WasteSpot), 1, fp) == 1)
+    {
+        if (record.spotID != spot.spotID)
+            continue;
+
+        // Step back to the start of this record and overwrite it
+        fseek(fp, -(long)sizeof(WasteSpot), SEEK_CUR);
+
+        record = spot;
+        record.next = NULL;
+        record.applicantHead = NULL;
+
+        bool saved = fwrite(&record, sizeof(WasteSpot), 1, fp) == 1;
+
+        fclose(fp);
+        return saved;
+    }
+
+    fclose(fp);
+    return false;
+}
+
+WasteSpot *SpotList::findSpot(int spotID)
+{
+    for (WasteSpot *current = head; current != nullptr; current = current->next)
+    {
+        if (current->spotID == spotID)
+            return current;
+    }
+
+    return nullptr;
+}
+
 void SpotList::display()
 {
     const char *sizeNames[] = {"Small", "Medium", "Large"};
-    const char *statusNames[] = {"Pending", "Verified", "Funded", "Assigned", "Completed"};
+    const char *statusNames[] = {"Pending", "Verified", "Funded", "Assigned", "Completed", "Rejected"};
 
     cout << "\n===== WASTE SPOTS =====\n";
 
@@ -146,6 +206,12 @@ void SpotList::display()
         cout << "Size: " << sizeNames[current->estimatedSize] << endl;
         cout << "Workers Needed: " << current->workerLimit << endl;
         cout << "Status: " << statusNames[current->status] << endl;
+
+        if (current->moderatorID != 0)
+            cout << "Checked by Moderator: " << current->moderatorID << endl;
+
+        cout << "Funded: Rs " << current->fundedAmount
+             << " / Rs " << current->cleanupCost << endl;
         cout << "Photo: " << current->photoPath << endl;
         cout << "------------------\n";
 

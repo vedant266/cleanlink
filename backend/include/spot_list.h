@@ -25,6 +25,12 @@ public:
 
     int addSpot(WasteSpot spot);
 
+    // Save a changed spot (e.g. new status) over its old record in the .dat file
+    bool updateSpot(const WasteSpot &spot);
+
+    // Walk the list for this ID. Returns nullptr if there is no such spot.
+    WasteSpot *findSpot(int spotID);
+
     void display();
 
     WasteSpot *getHead() { return head; }

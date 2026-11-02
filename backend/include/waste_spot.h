@@ -16,10 +16,15 @@ typedef enum {
     VERIFIED,
     FUNDED,
     ASSIGNED,
-    COMPLETED
+    COMPLETED,
+    // Added last so the numbers already saved in waste_spots.dat keep their meaning
+    REJECTED
 } SpotStatus;
 
 #define MAX_ASSIGNED_WORKERS 20
+
+// Rupees paid to each worker. cleanupCost = workerLimit * WAGE_PER_WORKER
+#define WAGE_PER_WORKER 500
 
 typedef struct WasteSpot
 {
@@ -40,6 +45,13 @@ typedef struct WasteSpot
     int workerLimit;
 
     SpotStatus status;
+
+    // Moderator who verified or rejected the report (0 = not checked yet)
+    int moderatorID;
+
+    // Funding, in whole rupees (int, not double, so totals add up exactly)
+    int cleanupCost;
+    int fundedAmount;
 
     // Linked list of applicants
     Applicant *applicantHead;
