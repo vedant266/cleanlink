@@ -8,6 +8,20 @@
 
 using namespace std;
 
+int workersForSize(WasteSize size)
+{
+    if (size == SMALL)
+    {
+        return 2;
+    }
+    else if (size == MEDIUM)
+    {
+        return 5;
+    }
+
+    return 10;
+}
+
 void ReportSpot::reportSpot(SpotList &spots)
 {
     int reporterID;
@@ -115,18 +129,9 @@ int ReportSpot::saveReport(SpotList &spots, int reporterID,
     spot.applicantHead = NULL;
     spot.assignedCount = 0;
 
-    if (estimatedSize == SMALL)
-    {
-        spot.workerLimit = 2;
-    }
-    else if (estimatedSize == MEDIUM)
-    {
-        spot.workerLimit = 5;
-    }
-    else
-    {
-        spot.workerLimit = 10;
-    }
+    spot.workerLimit = workersForSize(estimatedSize);
+    spot.cleanupCost = spot.workerLimit * WAGE_PER_WORKER;
+    spot.fundedAmount = 0;
 
     int spotID = spots.addSpot(spot);
 

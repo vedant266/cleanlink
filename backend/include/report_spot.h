@@ -5,6 +5,9 @@
 #include "city_hash.h"
 #include "spot_list.h"
 
+// Workers a spot of this size needs. Used when reporting and when a moderator corrects the size.
+int workersForSize(WasteSize size);
+
 class ReportSpot
 {
 private:
@@ -15,6 +18,9 @@ public:
     void loadTables(SpotList &spots);
 
     void displayTables();
+
+    // Funding walks City -> Locality -> spot through this table
+    CityHashTable &getCityTable() { return cityTable; }
 
     void reportSpot(SpotList &spots);
 
