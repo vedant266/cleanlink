@@ -11,7 +11,7 @@ if errorlevel 1 (
 )
 
 echo Building CleanLink web...
-wsl --cd "%~dp0." bash -c "clang++ -std=c++17 -Ibackend/include -Ibackend/api backend/web/server.cpp backend/src/*.cpp backend/api/*.cpp -lcurl -o cleanlink-web"
+wsl --cd "%~dp0." bash -c "clang++ -O2 -std=c++17 -Ibackend/include -Ibackend/api backend/web/server.cpp backend/src/*.cpp backend/api/*.cpp -lcurl -o cleanlink-web"
 if errorlevel 1 (
     echo Build failed.
     echo If WSL or curl/curl.h is missing, run:  wsl sudo apt install -y clang libcurl4-openssl-dev

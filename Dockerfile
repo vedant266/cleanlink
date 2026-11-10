@@ -11,7 +11,7 @@ COPY backend backend
 COPY frontend frontend
 
 # 3. Compile the web server (same command as web.command, with g++ instead of clang++)
-RUN g++ -std=c++17 -Ibackend/include -Ibackend/api \
+RUN g++ -O2 -std=c++17 -Ibackend/include -Ibackend/api \
     backend/web/server.cpp backend/src/*.cpp backend/api/*.cpp \
     -lcurl -o cleanlink-web
 

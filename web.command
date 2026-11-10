@@ -4,7 +4,7 @@
 cd "$(dirname "$0")" || exit 1
 
 echo "Building CleanLink web..."
-if ! clang++ -std=c++17 \
+if ! clang++ -O2 -std=c++17 \
     -Ibackend/include -Ibackend/api \
     backend/web/server.cpp backend/src/*.cpp backend/api/*.cpp \
     -lcurl -o cleanlink-web
