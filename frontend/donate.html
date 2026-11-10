@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CleanLink · Donate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+
+  <div>
+    <div class="band slim">
+      <div class="top">
+        <a href="./">CleanLink</a>
+        <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html" aria-current="page">Donate</a><a href="moderate.html">Moderate</a></nav>
+      </div>
+    </div>
+    <h1 class="title">Donate</h1>
+    <p class="lead">Spots a moderator has verified. Pick one and give towards its cleanup:
+       Rs 500 pays one worker. A spot closes once it is fully funded.</p>
+  </div>
+
+  <section class="spots">
+    <h2>Spots raising money</h2>
+    <div>
+      <ul class="list" id="list"></ul>
+    </div>
+    <div class="detail" id="detail"></div>
+  </section>
+
+</div>
+
+<script src="common.js"></script>
+<script>
+  function donateForm(s) {
+    const left = s.cleanupCost - s.fundedAmount;
+    const chips = [500, 1000].filter(a => a < left)
+      .map(a => `<button type="button" class="chip" data-amount="${a}">${rs(a)}</button>`).join('');
+    return `<form class="act" id="donate">
+      <h3>Donate</h3>
+      <label>Donor ID <input class="text" name="donorID" type="number" min="1" placeholder="301" required></label>
+      <label>Amount (Rs) <input class="text" name="amount" type="number" min="1" max="${left}" placeholder="${left}" required></label>
+      <div class="chips">${chips}<button type="button" class="chip" data-amount="${left}">Rest · ${rs(left)}</button></div>
+      <div class="buttons"><button class="btn">Donate &rarr;</button></div>
+      <p class="note"></p>
+    </form>`;
+  }
+
+  spotBrowser({
+    // Raising money, or already funded (so donors can see what their money did)
+    filter: s => isOpen(s) || isFunded(s),
+    actions: s => isOpen(s) ? donateForm(s) : '',
+    empty: 'No verified spots yet. A moderator has to check new reports first.',
+    submit: async (form, spot) => {
+      const fd = new FormData(form);
+      const s = await post('/api/donate', {
+        spotID: spot.id, donorID: Number(fd.get('donorID')), amount: Number(fd.get('amount')),
+      });
+      return { id: s.id, note: s.status === 'Funded' ? `Spot #${s.id} is now fully funded!` : 'Thank you! Donation saved.' };
+    },
+  }).load();
+</script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CleanLink · Moderate</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+
+  <div>
+    <div class="band slim">
+      <div class="top">
+        <a href="./">CleanLink</a>
+        <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html">Donate</a><a href="moderate.html" aria-current="page">Moderate</a></nav>
+      </div>
+    </div>
+    <h1 class="title">Moderate</h1>
+    <p class="lead">New reports wait here. Open the map link, check the photo shows real waste at that
+       place, set the actual size, then approve or reject. You can't check your own report.</p>
+  </div>
+
+  <section class="spots">
+    <h2>Reports waiting for a moderator</h2>
+    <div>
+      <ul class="list" id="list"></ul>
+    </div>
+    <div class="detail" id="detail"></div>
+  </section>
+
+</div>
+
+<script src="common.js"></script>
+<script>
+  function verifyForm(s) {
+    const reported = SIZES.indexOf(s.size);
+    const sizes = SIZES.map((name, i) => `<label><input type="radio" name="size" value="${i}"${i === reported ? ' checked' : ''}>
+      <span>${name}<small>${WORKERS[i]} · ${rs(WORKERS[i] * WAGE)}</small></span></label>`).join('');
+    // No city from the GPS: the moderator reads it off the map link
+    const place = (!s.city || s.city === 'Unknown') ? `
+      <label>City (read it from the map link) <input class="text" name="city" required></label>
+      <label>Locality <input class="text" name="locality" required></label>` : '';
+    return `<form class="act" id="verify">
+      <h3>Verify</h3>
+      <label>Moderator ID <input class="text" name="moderatorID" type="number" min="1" placeholder="201" required></label>
+      ${place}
+      <div><label>Actual size · workers · cost</label><div class="sizes">${sizes}</div></div>
+      <div class="buttons">
+        <button class="btn" value="approve">Approve</button>
+        <button class="btn ghost" value="reject" formnovalidate>Reject</button>
+      </div>
+      <p class="note"></p>
+    </form>`;
+  }
+
+  spotBrowser({
+    filter: s => s.status === 'Pending',
+    actions: s => s.status === 'Pending' ? verifyForm(s) : '',
+    empty: 'No reports waiting. New reports show up here.',
+    submit: async (form, spot, action) => {
+      const fd = new FormData(form);
+      action = action || 'approve';
+      const s = await post('/api/verify', {
+        spotID: spot.id, moderatorID: Number(fd.get('moderatorID')), action,
+        size: Number(fd.get('size')),
+        city: (fd.get('city') || '').trim(), locality: (fd.get('locality') || '').trim(),
+      });
+      return { id: s.id, note: action === 'reject' ? `Spot #${s.id} rejected.` : `Spot #${s.id} verified. Open for donations.` };
+    },
+  }).load();
+</script>
+</body>
+</html>
