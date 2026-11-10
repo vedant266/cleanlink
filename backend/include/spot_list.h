@@ -26,6 +26,10 @@ public:
     SpotList();
     ~SpotList();
 
+    // The list owns its nodes, so a copy would free them twice
+    SpotList(const SpotList&) = delete;
+    SpotList& operator=(const SpotList&) = delete;
+
     void loadFromFile();
 
     // Returns the new spot's ID, or 0 if it could not be saved

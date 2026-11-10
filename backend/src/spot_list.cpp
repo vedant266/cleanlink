@@ -2,8 +2,28 @@
 
 #include <iostream>
 #include <cstdio>
+#include <cstring>
 
 using namespace std;
+
+// True if a record read from the file has values the program can use.
+// display() uses status and size as array indexes, so a damaged value
+// would read past the end of those arrays.
+static bool isValidRecord(const WasteSpot &spot)
+{
+    // Text fields must end inside their arrays
+    if (memchr(spot.cityName, '\0', sizeof(spot.cityName)) == NULL ||
+        memchr(spot.localityName, '\0', sizeof(spot.localityName)) == NULL ||
+        memchr(spot.photoPath, '\0', sizeof(spot.photoPath)) == NULL ||
+        memchr(spot.wasteType, '\0', sizeof(spot.wasteType)) == NULL)
+        return false;
+
+    return spot.spotID >= 1 &&
+           spot.status >= PENDING && spot.status <= REJECTED &&
+           spot.estimatedSize >= SMALL && spot.estimatedSize <= LARGE &&
+           spot.workerLimit >= 0 &&
+           spot.assignedCount >= 0 && spot.assignedCount <= MAX_ASSIGNED_WORKERS;
+}
 
 SpotList::SpotList()
 {
@@ -117,9 +137,16 @@ void SpotList::loadFromFile()
 
     WasteSpot spot;
     int count = 0;
+    int damaged = 0;
 
     while (fread(&spot, sizeof(WasteSpot), 1, fp) == 1)
     {
+        if (!isValidRecord(spot))
+        {
+            damaged++;
+            continue;
+        }
+
         appendNode(spot);
         count++;
     }
@@ -128,6 +155,14 @@ void SpotList::loadFromFile()
 
     cout << "Loaded " << count
          << " waste spot(s) from " << SPOT_FILE << endl;
+
+    // Same rule as a wrong-sized file: don't write into a file we can't fully read
+    if (damaged > 0)
+    {
+        cout << damaged << " damaged record(s) in " << SPOT_FILE << " were skipped.\n"
+             << "Until the file is fixed, new reports and changes will NOT be saved.\n";
+        canSave = false;
+    }
 }
 
 int SpotList::addSpot(WasteSpot spot)
