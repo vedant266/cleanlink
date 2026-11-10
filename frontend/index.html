@@ -4,48 +4,34 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CleanLink</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 
-  <div>
-    <div class="band">
-      <div class="top">
-        <a href="./">CleanLink</a>
-        <nav><a href="./" aria-current="page">Home</a><a href="report.html">Report</a><a href="donate.html">Donate</a><a href="moderate.html">Moderate</a><a href="work.html">Work</a></nav>
-      </div>
-    </div>
-    <h1 class="hero">cleanlink</h1>
-    <div class="band">
-      <div class="info">
-        <p>Report a waste spot by uploading a photo. The location is read from the photo's GPS data
-           and turned into a city and locality. Each spot is sized, and the size decides how many
-           local workers the cleanup needs: small 2, medium 5, large 10. A moderator checks each
-           report, and once it is verified anyone can fund its cleanup at Rs 500 per worker.</p>
-        <div class="diag"><span class="a">REPORT</span><span class="b">CLEAN</span></div>
-      </div>
-      <div class="stats">
-        <span id="count">0 spots</span><span id="cities">0 cities</span><span id="raised">Rs 0 raised</span><span>Ver 1.0</span><span>(Ready)</span>
-      </div>
-    </div>
-  </div>
+  <header class="top">
+    <a class="brand" href="./">CleanLink</a>
+    <nav><a href="./" aria-current="page">Home</a><a href="report.html">Report</a><a href="donate.html">Donate</a><a href="moderate.html">Moderate</a><a href="work.html">Work</a></nav>
+  </header>
 
-  <div class="roles">
-    <a class="role" href="report.html"><b>Report &rarr;</b><span>Seen waste piling up? Upload a photo and the place is read from its GPS.</span></a>
-    <a class="role" href="donate.html"><b>Donate &rarr;</b><span>Fund the cleanup of a verified spot. Rs 500 pays one worker.</span></a>
-    <a class="role" href="moderate.html"><b>Moderate &rarr;</b><span>Check new reports: real place, real waste, actual size. Assign workers.</span></a>
-    <a class="role" href="work.html"><b>Work &rarr;</b><span>Find paid cleanup jobs near you and apply. Rs 500 per job.</span></a>
-  </div>
+  <h1>CleanLink</h1>
+  <p class="lead">Report a waste spot by uploading a photo. The location is read from the photo's GPS data
+     and turned into a city and locality. Each spot is sized, and the size decides how many
+     local workers the cleanup needs: small 2, medium 5, large 10. A moderator checks each
+     report, and once it is verified anyone can fund its cleanup at Rs 500 per worker.</p>
+
+  <p class="stats"><span id="count">0 spots</span><span id="cities">0 cities</span><span id="raised">Rs 0 raised</span></p>
+
+  <ul class="roles">
+    <li><a href="report.html">Report a spot</a><p>Seen waste piling up? Upload a photo and the place is read from its GPS.</p></li>
+    <li><a href="donate.html">Donate</a><p>Fund the cleanup of a verified spot. Rs 500 pays one worker.</p></li>
+    <li><a href="moderate.html">Moderate</a><p>Check new reports: real place, real waste, actual size. Assign workers.</p></li>
+    <li><a href="work.html">Work</a><p>Find paid cleanup jobs near you and apply. Rs 500 per job.</p></li>
+  </ul>
 
   <section class="spots">
     <h2>Waste spots</h2>
-    <div>
-      <ul class="list" id="list"></ul>
-    </div>
+    <ul class="list" id="list"></ul>
     <div class="detail" id="detail"></div>
   </section>
 

@@ -4,31 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CleanLink · Donate</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 
-  <div>
-    <div class="band slim">
-      <div class="top">
-        <a href="./">CleanLink</a>
-        <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html" aria-current="page">Donate</a><a href="moderate.html">Moderate</a><a href="work.html">Work</a></nav>
-      </div>
-    </div>
-    <h1 class="title">Donate</h1>
-    <p class="lead">Spots a moderator has verified. Pick one and give towards its cleanup:
-       Rs 500 pays one worker. A spot closes once it is fully funded.</p>
-  </div>
+  <header class="top">
+    <a class="brand" href="./">CleanLink</a>
+    <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html" aria-current="page">Donate</a><a href="moderate.html">Moderate</a><a href="work.html">Work</a></nav>
+  </header>
+
+  <h1>Donate</h1>
+  <p class="lead">Spots a moderator has verified. Pick one and give towards its cleanup:
+     Rs 500 pays one worker. A spot closes once it is fully funded.</p>
 
   <section class="spots">
     <h2>Spots raising money</h2>
-    <div>
-      <ul class="list" id="list"></ul>
-    </div>
+    <ul class="list" id="list"></ul>
     <div class="detail" id="detail"></div>
   </section>
 
@@ -51,8 +43,8 @@
   }
 
   spotBrowser({
-    // Raising money, or funded and being cleaned. Finished spots are on the home page.
-    filter: s => isOpen(s) || (isFunded(s) && !isFinished(s)),
+    // Raising money, or already funded (so donors can see what their money did)
+    filter: s => isOpen(s) || isFunded(s),
     actions: s => isOpen(s) ? donateForm(s) : '',
     empty: 'No verified spots yet. A moderator has to check new reports first.',
     submit: async (form, spot) => {

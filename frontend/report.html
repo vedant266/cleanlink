@@ -4,86 +4,62 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CleanLink · Report</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 
-  <div>
-    <div class="band slim">
-      <div class="top">
-        <a href="./">CleanLink</a>
-        <nav><a href="./">Home</a><a href="report.html" aria-current="page">Report</a><a href="donate.html">Donate</a><a href="moderate.html">Moderate</a><a href="work.html">Work</a></nav>
-      </div>
-    </div>
-    <h1 class="title">Report</h1>
-    <p class="lead">Upload a photo of the waste. Its GPS gives the city and locality. If the photo has
-       no GPS, type the latitude and longitude. A moderator checks every report before it can be funded.</p>
-  </div>
+  <header class="top">
+    <a class="brand" href="./">CleanLink</a>
+    <nav><a href="./">Home</a><a href="report.html" aria-current="page">Report</a><a href="donate.html">Donate</a><a href="moderate.html">Moderate</a><a href="work.html">Work</a></nav>
+  </header>
 
-  <form class="paper" id="form">
-    <svg class="badge" viewBox="0 0 120 120" aria-hidden="true">
-      <defs><path id="ring" d="M60,60 m-44,0 a44,44 0 1,1 88,0 a44,44 0 1,1 -88,0"/></defs>
-      <circle cx="60" cy="60" r="30" fill="none" stroke="#161616" stroke-width=".8"/>
-      <text font-family="IBM Plex Mono, monospace" font-size="11" letter-spacing="1.6">
-        <textPath href="#ring">CLEANLINK · REPORT A SPOT · </textPath>
-      </text>
-    </svg>
+  <h1>Report</h1>
+  <p class="lead">Upload a photo of the waste. Its GPS gives the city and locality. If the photo has
+     no GPS, type the latitude and longitude. A moderator checks every report before it can be funded.</p>
 
-    <h2>Report a waste spot</h2>
-
-    <div class="row one">
-      <label class="small">Photo
-        <span class="drop">
-          <input type="file" name="photo" id="photo" accept="image/jpeg,image/*">
-          <span class="thumb" id="thumb">+</span>
-          <b id="photoName">Upload photo</b>
-        </span>
-      </label>
-    </div>
+  <form class="form" id="form">
+    <label>Photo
+      <input type="file" name="photo" id="photo" accept="image/jpeg,image/*">
+    </label>
+    <img class="thumb" id="thumb" alt="Selected photo" hidden>
 
     <div class="row">
-      <label class="small field">Reporter ID
+      <label>Reporter ID
         <input name="reporterID" type="number" min="1" placeholder="101" required>
       </label>
-      <label class="small field">Waste type
+      <label>Waste type
         <input name="wasteType" placeholder="plastic" required>
       </label>
     </div>
 
-    <div class="row one">
-      <div class="small">Size / workers needed
-        <div class="sizes">
-          <label><input type="radio" name="size" value="0" required><span>Small<small>2</small></span></label>
-          <label><input type="radio" name="size" value="1"><span>Medium<small>5</small></span></label>
-          <label><input type="radio" name="size" value="2"><span>Large<small>10</small></span></label>
-        </div>
+    <fieldset>
+      <legend>Size (workers needed)</legend>
+      <div class="sizes">
+        <label><input type="radio" name="size" value="0" required><span>Small<small>2</small></span></label>
+        <label><input type="radio" name="size" value="1"><span>Medium<small>5</small></span></label>
+        <label><input type="radio" name="size" value="2"><span>Large<small>10</small></span></label>
       </div>
-    </div>
+    </fieldset>
 
     <div class="row gps" id="gps">
-      <label class="small field">Latitude (photo had no GPS)
+      <label>Latitude (photo had no GPS)
         <input name="latitude" type="number" step="any" placeholder="19.0760">
       </label>
-      <label class="small field">Longitude
+      <label>Longitude
         <input name="longitude" type="number" step="any" placeholder="72.8777">
       </label>
     </div>
 
     <div class="submit">
+      <button id="send">Report spot</button>
       <span class="msg" id="msg"></span>
-      <button id="send">Report spot &rarr;</button>
     </div>
   </form>
 
   <section class="spots">
     <h2>Open waste spots</h2>
-    <div>
-      <ul class="list" id="list"></ul>
-    </div>
+    <ul class="list" id="list"></ul>
     <div class="detail" id="detail"></div>
   </section>
 
@@ -93,9 +69,10 @@
 <script>
   const form = document.getElementById('form');
   const photo = document.getElementById('photo');
+  const thumb = document.getElementById('thumb');
   const msg = document.getElementById('msg');
   const send = document.getElementById('send');
-  // Cleaned spots are finished, so they're left out here (they're on the home page)
+  // Cleaned spots are finished, so they are left out here (they are on the home page)
   const browser = spotBrowser({
     filter: s => !isFinished(s),
     empty: 'No open spots right now. Cleaned spots are on the home page.',
@@ -103,11 +80,8 @@
 
   photo.addEventListener('change', () => {
     const file = photo.files[0];
-    if (!file) return;
-    document.getElementById('photoName').textContent = file.name;
-    const thumb = document.getElementById('thumb');
-    thumb.style.backgroundImage = `url(${URL.createObjectURL(file)})`;
-    thumb.textContent = '';
+    thumb.hidden = !file;
+    if (file) thumb.src = URL.createObjectURL(file);
     document.getElementById('gps').classList.remove('show');
   });
 
@@ -130,9 +104,7 @@
 
       msg.textContent = `Spot #${data.id} reported: ${data.city || 'unknown city'}, ${data.locality || '—'}`;
       form.reset();
-      document.getElementById('thumb').style.backgroundImage = '';
-      document.getElementById('thumb').textContent = '+';
-      document.getElementById('photoName').textContent = 'Upload photo';
+      thumb.hidden = true;
       document.getElementById('gps').classList.remove('show');
       await browser.load(data.id);
     } catch {

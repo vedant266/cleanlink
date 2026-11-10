@@ -4,57 +4,43 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CleanLink · Moderate</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 
-  <div>
-    <div class="band slim">
-      <div class="top">
-        <a href="./">CleanLink</a>
-        <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html">Donate</a><a href="moderate.html" aria-current="page">Moderate</a><a href="work.html">Work</a></nav>
-      </div>
-    </div>
-    <h1 class="title">Moderate</h1>
-    <p class="lead">New reports wait here. Open the map link, check the photo shows real waste at that
-       place, set the actual size, then approve or reject. You can't check your own report.
-       Once a spot is fully funded and workers have applied, assign the best of them below.
-       When the workers send an "after" photo, compare it with the report photo and approve or reject.</p>
-  </div>
+  <header class="top">
+    <a class="brand" href="./">CleanLink</a>
+    <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html">Donate</a><a href="moderate.html" aria-current="page">Moderate</a><a href="work.html">Work</a></nav>
+  </header>
+
+  <h1>Moderate</h1>
+  <p class="lead">New reports wait here. Open the map link, check the photo shows real waste at that
+     place, set the actual size, then approve or reject. You can't check your own report.
+     Once a spot is fully funded and workers have applied, assign the best of them below.
+     When the workers send an "after" photo, compare it with the report photo and approve or reject.</p>
 
   <section class="spots">
     <h2>Reports waiting for a moderator</h2>
-    <div>
-      <ul class="list" id="list"></ul>
-    </div>
+    <ul class="list" id="list"></ul>
     <div class="detail" id="detail"></div>
   </section>
 
   <section class="spots">
     <h2>Funded spots: assign workers</h2>
-    <div>
-      <ul class="list" id="fundedList"></ul>
-    </div>
+    <ul class="list" id="fundedList"></ul>
     <div class="detail" id="fundedDetail"></div>
   </section>
 
   <section class="spots">
     <h2>Finished work to check</h2>
-    <div>
-      <ul class="list" id="checkList"></ul>
-    </div>
+    <ul class="list" id="checkList"></ul>
     <div class="detail" id="checkDetail"></div>
   </section>
 
   <section class="spots">
     <h2>Cleaned spots</h2>
-    <div>
-      <ul class="list" id="doneList"></ul>
-    </div>
+    <ul class="list" id="doneList"></ul>
     <div class="detail" id="doneDetail"></div>
   </section>
 

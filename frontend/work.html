@@ -4,54 +4,47 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>CleanLink · Work</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="page">
 
-  <div>
-    <div class="band slim">
-      <div class="top">
-        <a href="./">CleanLink</a>
-        <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html">Donate</a><a href="moderate.html">Moderate</a><a href="work.html" aria-current="page">Work</a></nav>
-      </div>
-    </div>
-    <h1 class="title">Work</h1>
-    <p class="lead">Funded cleanup jobs within 20 km of you, nearest first. Apply for the ones you can
-       do; a moderator then picks the workers: the closest first, then by rating, then who applied first.
-       Each job pays Rs 500 per worker.
-       When you finish, send an "after" photo from My jobs; a moderator checks it before the
-       spot is marked cleaned.</p>
-  </div>
+  <header class="top">
+    <a class="brand" href="./">CleanLink</a>
+    <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html">Donate</a><a href="moderate.html">Moderate</a><a href="work.html" aria-current="page">Work</a></nav>
+  </header>
 
-  <form class="paper short" id="find">
+  <h1>Work</h1>
+  <p class="lead">Funded cleanup jobs within 20 km of you, nearest first. Apply for the ones you can
+     do; a moderator then picks the workers: the closest first, then by rating, then who applied first.
+     Each job pays Rs 500 per worker.
+     When you finish, send an "after" photo from My jobs; a moderator checks it before the
+     spot is marked cleaned.</p>
+
+  <form class="form" id="find">
     <h2>Find jobs near you</h2>
 
-    <div class="row">
-      <label class="small field">Worker ID
-        <input name="workerID" type="number" min="1" placeholder="401" required>
-      </label>
-      <div class="small">Your location
-        <button type="button" class="locate" id="locate">Use my location</button>
-        <span class="locnote" id="locNote"></span>
-      </div>
+    <label>Worker ID
+      <input name="workerID" type="number" min="1" placeholder="401" required>
+    </label>
+
+    <div class="submit">
+      <button type="button" class="ghost" id="locate">Use my location</button>
+      <span class="locnote" id="locNote"></span>
     </div>
 
     <div class="row">
-      <label class="small field">Latitude
+      <label>Latitude
         <input name="latitude" type="number" step="any" min="-90" max="90" placeholder="30.3165" required>
       </label>
-      <label class="small field">Longitude
+      <label>Longitude
         <input name="longitude" type="number" step="any" min="-180" max="180" placeholder="78.0322" required>
       </label>
     </div>
 
     <div class="submit">
+      <button>Find jobs</button>
       <span class="msg" id="msg"></span>
-      <button>Find jobs &rarr;</button>
     </div>
   </form>
 
