@@ -695,9 +695,28 @@ int main(int argc, char *argv[])
     if (getenv("PORT"))
         port = atoi(getenv("PORT"));
 
+    // The library's default (SO_REUSEPORT) lets a second program share the port, so
+    // starting web.command twice quietly ran two servers, each with its own copy of
+    // the spots in memory. SO_REUSEADDR only allows a quick restart, not two at once.
+    server.set_socket_options([](socket_t sock) {
+        int on = 1;
+#ifdef _WIN32
+        setsockopt(sock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char *>(&on), sizeof(on));
+#else
+        setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+#endif
+    });
+
     // 0.0.0.0 = accept visitors from outside this computer, not just localhost
+    if (!server.bind_to_port("0.0.0.0", port))
+    {
+        std::cerr << "Port " << port << " is already in use. Is CleanLink already running?\n"
+                  << "Close the other CleanLink window first, then start it again.\n";
+        return 1;
+    }
+
     std::cout << "CleanLink running at http://localhost:" << port << std::endl;
-    server.listen("0.0.0.0", port);
+    server.listen_after_bind();
 
     return 0;
 }
