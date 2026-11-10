@@ -7,6 +7,7 @@
 #include <mutex>
 #include <ctime>
 #include <cstdlib>
+#include <climits>
 #include <fstream>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -14,6 +15,8 @@
 #include "report_spot.h"
 #include "spot_list.h"
 #include "photo_location.h"
+#include "funding.h"
+#include "verification.h"
 
 using json = nlohmann::json;
 
@@ -22,7 +25,9 @@ using json = nlohmann::json;
 
 SpotList spots;
 ReportSpot report;
-std::mutex spotsLock; // one report at a time
+Funding funding;
+Verification verification;
+std::mutex spotsLock; // one change to the spots at a time
 
 json spotToJson(const WasteSpot *spot)
 {
@@ -40,6 +45,9 @@ json spotToJson(const WasteSpot *spot)
         {"size", sizeNames[spot->estimatedSize]},
         {"workersNeeded", spot->workerLimit},
         {"status", statusNames[spot->status]},
+        {"moderatorID", spot->moderatorID},
+        {"cleanupCost", spot->cleanupCost},
+        {"fundedAmount", spot->fundedAmount},
         {"photo", spot->photoPath}
     };
 }
@@ -48,6 +56,36 @@ void sendError(httplib::Response &res, const std::string &message)
 {
     res.status = 400;
     res.set_content(json{{"error", message}}.dump(), "application/json");
+}
+
+// Donate and verify send JSON like {"spotID": 1, "amount": 500}
+bool readBody(const httplib::Request &req, json &body)
+{
+    body = json::parse(req.body, nullptr, false);  // false = no exception on bad JSON
+    return !body.is_discarded() && body.is_object();
+}
+
+// IDs and amounts are whole numbers from 1 up. Anything else (missing, text,
+// decimal, too big for an int) comes back as 0, which the checks then refuse.
+int positiveField(const json &body, const char *key)
+{
+    if (!body.contains(key) || !body[key].is_number_integer())
+        return 0;
+
+    long long value = body[key].get<long long>();
+
+    if (value < 1 || value > INT_MAX)
+        return 0;
+
+    return (int)value;
+}
+
+std::string textField(const json &body, const char *key)
+{
+    if (!body.contains(key) || !body[key].is_string())
+        return "";
+
+    return body[key].get<std::string>();
 }
 
 int main(int argc, char *argv[])
@@ -61,6 +99,9 @@ int main(int argc, char *argv[])
     mkdir(UPLOAD_DIR, 0755);
     spots.loadFromFile();
     report.loadTables(spots);
+
+    // Finds the next free donation ID, so IDs don't start again at 1
+    funding.loadFromFile();
 
     httplib::Server server;
 
@@ -145,6 +186,106 @@ int main(int argc, char *argv[])
         for (WasteSpot *s = spots.getHead(); s != nullptr; s = s->next)
             if (s->spotID == id)
                 res.set_content(spotToJson(s).dump(), "application/json");
+    });
+
+    // Moderator checks a pending report: {"moderatorID", "spotID", "action": "approve" | "reject",
+    // "size": 0-2, and "city" + "locality" only when the spot's city came back "Unknown"}
+    server.Post("/api/verify", [](const httplib::Request &req, httplib::Response &res) {
+        json body;
+        if (!readBody(req, body))
+            return sendError(res, "Send the check as JSON.");
+
+        int moderatorID = positiveField(body, "moderatorID");
+        int spotID = positiveField(body, "spotID");
+        std::string action = textField(body, "action");
+
+        if (moderatorID == 0)
+            return sendError(res, "Enter your moderator ID.");
+
+        std::lock_guard<std::mutex> guard(spotsLock);
+
+        Moderator moderator(moderatorID);
+        VerifyResult result;
+
+        if (action == "reject")
+        {
+            result = verification.rejectSpot(spots, spotID, moderator);
+        }
+        else if (action == "approve")
+        {
+            // Check the size before saving anything, so a bad size can't leave
+            // a spot with a new city but still pending
+            if (!body.contains("size") || !body["size"].is_number_integer() ||
+                body["size"].get<long long>() < SMALL || body["size"].get<long long>() > LARGE)
+                return sendError(res, Verification::resultMessage(VERIFY_BAD_SIZE));
+
+            WasteSize actualSize = (WasteSize)body["size"].get<int>();
+            std::string city = textField(body, "city");
+            std::string locality = textField(body, "locality");
+
+            result = VERIFY_OK;
+
+            // The moderator typed the real place from the map link
+            if (!city.empty() || !locality.empty())
+                result = verification.setLocation(spots, report.getCityTable(), spotID,
+                                                  moderator, city, locality);
+
+            if (result == VERIFY_OK)
+                result = verification.approveSpot(spots, spotID, moderator, actualSize);
+        }
+        else
+        {
+            return sendError(res, "Action must be approve or reject.");
+        }
+
+        if (result != VERIFY_OK)
+        {
+            sendError(res, Verification::resultMessage(result));
+            if (result == VERIFY_SAVE_FAILED)
+                res.status = 500;
+            return;
+        }
+
+        res.set_content(spotToJson(spots.findSpot(spotID)).dump(), "application/json");
+    });
+
+    // Donor gives money to a verified spot: {"donorID", "spotID", "amount"}
+    server.Post("/api/donate", [](const httplib::Request &req, httplib::Response &res) {
+        json body;
+        if (!readBody(req, body))
+            return sendError(res, "Send the donation as JSON.");
+
+        int donorID = positiveField(body, "donorID");
+        int spotID = positiveField(body, "spotID");
+        int amount = positiveField(body, "amount");
+
+        if (donorID == 0)
+            return sendError(res, "Enter your donor ID.");
+
+        std::lock_guard<std::mutex> guard(spotsLock);
+
+        WasteSpot *spot = spots.findSpot(spotID);
+        if (spot == nullptr)
+            return sendError(res, Funding::resultMessage(FUND_NO_SPOT));
+
+        // fundSpot goes City -> Locality -> spot, like the terminal menu.
+        // Old spots may have no locality saved; the city table files those under the city name.
+        std::string locality = spot->localityName;
+        if (locality.empty())
+            locality = spot->cityName;
+
+        FundResult result = funding.fundSpot(report.getCityTable(), spots, spot->cityName,
+                                             locality, spotID, Donor(donorID), amount);
+
+        if (result != FUND_OK)
+        {
+            sendError(res, Funding::resultMessage(result));
+            if (result == FUND_SAVE_FAILED)
+                res.status = 500;
+            return;
+        }
+
+        res.set_content(spotToJson(spot).dump(), "application/json");
     });
 
     // Photo of a spot, wherever it was saved (uploads/ or a path typed in the terminal app)
