@@ -5,7 +5,26 @@
 #include "funding.h"
 #include "verification.h"
 #include "worker_assignment.h"
+#include "user_table.h"
 using namespace std;
+
+// Anyone can sign up on the website as a user or worker, but not as a
+// moderator. The person running CleanLink makes moderator accounts here.
+void createModerator(UserTable &users) {
+    string username, password;
+    cout << "Moderator username: ";
+    cin >> username;
+    // shortcut: the password shows as it is typed and can't contain spaces
+    cout << "Password (8 or more characters): ";
+    cin >> password;
+
+    User *user;
+    UserResult result = users.signUp(username, password, "moderator", user);
+    if (result == USER_OK)
+        cout << "Moderator " << user->getUsername() << " created with ID " << user->getID() << ".\n";
+    else
+        cout << UserTable::resultMessage(result) << endl;
+}
 
 void showMenu() {
     cout << "\n===== CLEANLINK =====\n";
@@ -19,6 +38,7 @@ void showMenu() {
     cout << "8. View Donations\n";
     cout << "9. Verify Spot (Moderator)\n";
     cout << "10. Assign Workers (Moderator)\n";
+    cout << "11. Create Moderator Account\n";
     cout << "Enter choice: ";
 }
 
@@ -29,12 +49,14 @@ int main() {
     Funding funding;
     Verification verification;
     WorkerAssignment assignment;
+    UserTable users;
 
     spots.loadFromFile();
     report.loadTables(spots);
     funding.loadFromFile();
     // After the spots, so each application can find its spot
     assignment.loadFromFile(spots);
+    users.loadFromFile();
 
     do {
         showMenu();
@@ -90,6 +112,10 @@ int main() {
 
             case 10:
                 assignment.assignMenu(spots);
+                break;
+
+            case 11:
+                createModerator(users);
                 break;
 
             default:
