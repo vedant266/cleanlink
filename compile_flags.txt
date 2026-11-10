@@ -1,0 +1,4 @@
+-xc++
+-std=c++17
+-Ibackend/include
+-Ibackend/api
