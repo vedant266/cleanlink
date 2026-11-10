@@ -88,6 +88,12 @@ void ReportSpot::reportSpot(SpotList &spots)
     int spotID = saveReport(spots, reporter.getID(), latitude, longitude,
                             photoPath, wasteType, estimatedSize);
 
+    if (spotID == 0)
+    {
+        cout << "\nCould not save the report. Nothing was added.\n";
+        return;
+    }
+
     cout << "\nWaste spot #" << spotID << " reported successfully!\n";
 }
 
@@ -134,6 +140,11 @@ int ReportSpot::saveReport(SpotList &spots, int reporterID,
     spot.fundedAmount = 0;
 
     int spotID = spots.addSpot(spot);
+
+    // Not saved, so nothing was added. The tail is still the previous spot,
+    // so it must not be filed under a city again.
+    if (spotID == 0)
+        return 0;
 
     // The new node is at the end of SpotList; file it under its city and locality
     cityTable.addSpot(spots.getTail());

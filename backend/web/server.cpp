@@ -134,6 +134,14 @@ int main(int argc, char *argv[])
                                    photoPath.c_str(), wasteType.c_str(),
                                    (WasteSize)std::stoi(sizeValue));
 
+        if (id == 0)
+        {
+            remove(photoPath.c_str());
+            sendError(res, "Could not save the report. Nothing was added.");
+            res.status = 500;  // the server failed, not the form
+            return;
+        }
+
         for (WasteSpot *s = spots.getHead(); s != nullptr; s = s->next)
             if (s->spotID == id)
                 res.set_content(spotToJson(s).dump(), "application/json");
