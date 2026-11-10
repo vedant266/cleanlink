@@ -13,9 +13,14 @@ private:
     WasteSpot *tail;
     int nextSpotID;
 
+    // False when the .dat file could not be loaded. Writing to it then would
+    // mix new records with ones we can't read, and spot IDs would repeat.
+    bool canSave;
+
     void appendNode(const WasteSpot &spot);
 
-    void saveToFile(const WasteSpot &spot);
+    // Append one record. Returns false if it was not fully written.
+    bool saveToFile(const WasteSpot &spot);
 
 public:
     SpotList();
@@ -23,6 +28,8 @@ public:
 
     void loadFromFile();
 
+    // Returns the new spot's ID, or 0 if it could not be saved
+    // (the spot is then not added to the list either)
     int addSpot(WasteSpot spot);
 
     // Save a changed spot (e.g. new status) over its old record in the .dat file

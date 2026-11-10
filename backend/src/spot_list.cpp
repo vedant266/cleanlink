@@ -10,6 +10,7 @@ SpotList::SpotList()
     head = nullptr;
     tail = nullptr;
     nextSpotID = 1;
+    canSave = true;
 }
 
 SpotList::~SpotList()
@@ -61,14 +62,17 @@ void SpotList::appendNode(const WasteSpot &spot)
 }
 
 // Append one record to the .dat file
-void SpotList::saveToFile(const WasteSpot &spot)
+bool SpotList::saveToFile(const WasteSpot &spot)
 {
+    if (!canSave)
+        return false;
+
     FILE *fp = fopen(SPOT_FILE, "ab");
 
     if (fp == NULL)
     {
         cout << "Error opening " << SPOT_FILE << endl;
-        return;
+        return false;
     }
 
     // Pointers are meaningless after the program exits, so store them as NULL
@@ -76,9 +80,13 @@ void SpotList::saveToFile(const WasteSpot &spot)
     record.next = NULL;
     record.applicantHead = NULL;
 
-    fwrite(&record, sizeof(WasteSpot), 1, fp);
+    bool saved = fwrite(&record, sizeof(WasteSpot), 1, fp) == 1;
 
-    fclose(fp);
+    // fclose writes out anything still buffered, so it can fail too
+    if (fclose(fp) != 0)
+        saved = false;
+
+    return saved;
 }
 
 void SpotList::loadFromFile()
@@ -100,7 +108,9 @@ void SpotList::loadFromFile()
     if (fileSize % sizeof(WasteSpot) != 0)
     {
         cout << SPOT_FILE << " was saved by an older version of CleanLink.\n"
-             << "Delete or rename it to start fresh.\n";
+             << "Delete or rename it to start fresh.\n"
+             << "Until then, new reports and changes will NOT be saved.\n";
+        canSave = false;
         fclose(fp);
         return;
     }
@@ -124,8 +134,11 @@ int SpotList::addSpot(WasteSpot spot)
 {
     spot.spotID = nextSpotID;
 
+    // Save first, so the list never holds a spot that isn't in the file
+    if (!saveToFile(spot))
+        return 0;
+
     appendNode(spot);
-    saveToFile(spot);
 
     return spot.spotID;
 }
@@ -133,6 +146,9 @@ int SpotList::addSpot(WasteSpot spot)
 // Records are a fixed size, so find the spot's record and write over it
 bool SpotList::updateSpot(const WasteSpot &spot)
 {
+    if (!canSave)
+        return false;
+
     FILE *fp = fopen(SPOT_FILE, "r+b");
 
     if (fp == NULL)
@@ -157,7 +173,9 @@ bool SpotList::updateSpot(const WasteSpot &spot)
 
         bool saved = fwrite(&record, sizeof(WasteSpot), 1, fp) == 1;
 
-        fclose(fp);
+        if (fclose(fp) != 0)
+            saved = false;
+
         return saved;
     }
 
