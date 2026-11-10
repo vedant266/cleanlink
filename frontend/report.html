@@ -80,7 +80,7 @@
   </form>
 
   <section class="spots">
-    <h2>Waste spots</h2>
+    <h2>Open waste spots</h2>
     <div>
       <ul class="list" id="list"></ul>
     </div>
@@ -95,7 +95,11 @@
   const photo = document.getElementById('photo');
   const msg = document.getElementById('msg');
   const send = document.getElementById('send');
-  const browser = spotBrowser();
+  // Cleaned spots are finished, so they're left out here (they're on the home page)
+  const browser = spotBrowser({
+    filter: s => !isFinished(s),
+    empty: 'No open spots right now. Cleaned spots are on the home page.',
+  });
 
   photo.addEventListener('change', () => {
     const file = photo.files[0];
