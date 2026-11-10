@@ -2,7 +2,9 @@
 #define WORKER_ASSIGNMENT_H
 
 #include <string>
+#include <vector>
 #include "waste_spot.h"
+#include "array_sort.h"
 #include "spot_list.h"
 #include "city_hash.h"
 #include "user.h"
@@ -16,6 +18,9 @@ using namespace std;
 // Every worker gets this rating until CleanScore exists.
 // Workers never type their own rating, or everyone would pick 5.
 #define DEFAULT_WORKER_RATING 3.0
+
+// A worker is only shown jobs this close to them
+#define MAX_JOB_DISTANCE_KM 20.0
 
 // One saved application. The distance is not saved: it is worked out again
 // from the spot's GPS and the worker's GPS when the file is loaded.
@@ -80,6 +85,15 @@ public:
     static int rankApplicants(const WasteSpot *spot, Applicant *ranked[MAX_APPLICANTS]);
 
     static int countApplicants(const WasteSpot *spot);
+
+    // True if this worker has already applied for the spot
+    static bool hasApplied(const WasteSpot *spot, int workerID);
+
+    // Section 12 (first version): funded spots within MAX_JOB_DISTANCE_KM of
+    // the worker that they haven't applied for yet, nearest first.
+    // workerID 0 = don't leave any out.
+    static vector<SpotDistance> findJobs(SpotList &spots, double latitude,
+                                         double longitude, int workerID);
 
     // Terminal menus
     void applyMenu(CityHashTable &cities, SpotList &spots);

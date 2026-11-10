@@ -43,7 +43,7 @@ body { background: var(--black); color: var(--ink); font-family: var(--mono); pa
          font-size: 15px; padding-top: 28px; }
 
 /* role cards on the home page */
-.roles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.roles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .role { background: var(--paper); color: var(--ink); text-decoration: none; padding: 18px 16px 16px;
         display: grid; gap: 48px; align-content: space-between; }
 .role b { font: 400 22px var(--mono); }
@@ -131,11 +131,40 @@ label { display: block; }
 .act .sizes span { font-size: 15px; color: var(--grey); }
 .act .sizes input:checked + span { color: #fff; }
 .act .buttons { display: flex; gap: 8px; }
-.act .btn { background: var(--mist); color: var(--ink); border: 0; font: 13px var(--mono); padding: 11px 16px; cursor: pointer; }
-.act .btn.ghost { background: none; color: #fff; border: 1px solid #3a3a3a; }
-.act .btn:disabled { opacity: .5; cursor: wait; }
+.btn { background: var(--mist); color: var(--ink); border: 0; font: 13px var(--mono); padding: 11px 16px; cursor: pointer; }
+.btn.ghost { background: none; color: #fff; border: 1px solid #3a3a3a; }
+.btn:disabled { opacity: .5; cursor: wait; }
+.act .hint { font-size: 11px; color: var(--grey); line-height: 1.45; }
 .act .note { font-size: 12px; min-height: 1.2em; color: var(--mist); }
 .act .note.err { color: #ff9b8a; }
+
+/* work page: location button, job list */
+.paper.short h2 { padding-bottom: 48px; }
+.locate { display: block; background: none; border: 1px solid var(--ink); color: var(--ink); font: 15px var(--mono);
+          padding: 10px 14px; margin-top: 8px; cursor: pointer; }
+.locate:hover { background: var(--mist); }
+.locnote { display: block; margin-top: 8px; }
+.spots.one { grid-template-columns: 1fr; }
+.jobs { list-style: none; padding: 0; display: grid; gap: 12px; }
+.job { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 16px; align-items: center;
+       border-top: 1px solid #2c2c2c; padding-top: 12px; }
+.job img { width: 96px; height: 72px; object-fit: cover; display: block; background: #222; }
+.job b { font: 700 20px var(--narrow); color: #fff; display: block; }
+.job b small { font-weight: 400; color: var(--grey); font-size: 16px; }
+.job em { font-style: normal; font-size: 12px; color: var(--grey); display: block; margin-top: 3px; }
+.job a { color: inherit; }
+.job .side { display: flex; align-items: center; gap: 14px; }
+.job .km { font: 700 22px var(--narrow); color: var(--mist); white-space: nowrap; }
+
+/* moderator: ranked applicants (the priority queue's order) */
+.ranked { list-style: none; padding: 0; display: grid; gap: 8px; font-size: 12px; }
+.ranked li { display: grid; grid-template-columns: 22px 1fr; gap: 6px; color: var(--grey); }
+.ranked li.pick { color: #fff; }
+.ranked li em { font-style: normal; display: block; font-size: 11px; color: var(--grey); }
+
+@media (max-width: 960px) {
+  .roles { grid-template-columns: 1fr 1fr; }
+}
 
 @media (max-width: 760px) {
   .info, .row, .roles { grid-template-columns: 1fr; }
@@ -145,4 +174,7 @@ label { display: block; }
   .spots { grid-template-columns: 1fr; padding: 28px 18px; }
   .msg { max-width: 55%; }
   .role { gap: 24px; }
+  .job { grid-template-columns: 72px minmax(0, 1fr); }
+  .job img { width: 72px; height: 54px; }
+  .job .side { grid-column: 1 / -1; justify-content: space-between; }
 }

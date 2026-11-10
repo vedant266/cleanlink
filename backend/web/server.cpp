@@ -17,6 +17,7 @@
 #include "photo_location.h"
 #include "funding.h"
 #include "verification.h"
+#include "worker_assignment.h"
 
 using json = nlohmann::json;
 
@@ -27,6 +28,7 @@ SpotList spots;
 ReportSpot report;
 Funding funding;
 Verification verification;
+WorkerAssignment assignment;
 std::mutex spotsLock; // one change to the spots at a time
 
 json spotToJson(const WasteSpot *spot)
@@ -48,8 +50,61 @@ json spotToJson(const WasteSpot *spot)
         {"moderatorID", spot->moderatorID},
         {"cleanupCost", spot->cleanupCost},
         {"fundedAmount", spot->fundedAmount},
+        // Only how many applied and who was picked, never workers' locations
+        {"applicants", WorkerAssignment::countApplicants(spot)},
+        {"assignedWorkers", std::vector<int>(spot->assignedWorkers,
+                                             spot->assignedWorkers + spot->assignedCount)},
         {"photo", spot->photoPath}
     };
+}
+
+// What a moderator sees about one applicant: no GPS, only how far away they are
+json applicantToJson(const Applicant *a, bool assigned)
+{
+    return {
+        {"workerID", a->getWorkerID()},
+        {"distanceKm", a->getDistance()},
+        {"rating", a->getWorkerRating()},
+        {"appliedAt", a->getApplicationTime()},
+        {"assigned", assigned}
+    };
+}
+
+// Every applicant of a spot, best first (the priority queue's order)
+json rankedApplicants(const WasteSpot *spot)
+{
+    Applicant *ranked[MAX_APPLICANTS];
+    int count = WorkerAssignment::rankApplicants(spot, ranked);
+
+    json list = json::array();
+
+    for (int i = 0; i < count; i++)
+    {
+        bool assigned = false;
+        for (int j = 0; j < spot->assignedCount; j++)
+            if (spot->assignedWorkers[j] == ranked[i]->getWorkerID())
+                assigned = true;
+
+        list.push_back(applicantToJson(ranked[i], assigned));
+    }
+
+    return list;
+}
+
+// Latitude / longitude from the query string (?lat=..&lon=..). False if missing or not a number.
+bool readLocation(const httplib::Request &req, double &latitude, double &longitude)
+{
+    try
+    {
+        latitude = std::stod(req.get_param_value("lat"));
+        longitude = std::stod(req.get_param_value("lon"));
+    }
+    catch (const std::exception &)
+    {
+        return false;
+    }
+
+    return latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
 }
 
 void sendError(httplib::Response &res, const std::string &message)
@@ -88,6 +143,24 @@ std::string textField(const json &body, const char *key)
     return body[key].get<std::string>();
 }
 
+// A decimal number such as a latitude. False if missing or not a number.
+bool numberField(const json &body, const char *key, double &value)
+{
+    if (!body.contains(key) || !body[key].is_number())
+        return false;
+
+    value = body[key].get<double>();
+    return true;
+}
+
+// Same rule as the other routes: a failed save is the server's fault (500)
+void sendWorkError(httplib::Response &res, WorkResult result)
+{
+    sendError(res, WorkerAssignment::resultMessage(result));
+    if (result == WORK_SAVE_FAILED)
+        res.status = 500;
+}
+
 int main(int argc, char *argv[])
 {
     // Run from the repo folder so frontend/, uploads/ and the .dat file are found
@@ -102,6 +175,9 @@ int main(int argc, char *argv[])
 
     // Finds the next free donation ID, so IDs don't start again at 1
     funding.loadFromFile();
+
+    // After the spots, so each application can find its spot
+    assignment.loadFromFile(spots);
 
     httplib::Server server;
 
@@ -286,6 +362,109 @@ int main(int argc, char *argv[])
         }
 
         res.set_content(spotToJson(spot).dump(), "application/json");
+    });
+
+    // Section 12: jobs for a worker at ?lat=..&lon=.. (and &workerID=.. to leave out
+    // spots they already applied for), nearest first, within MAX_JOB_DISTANCE_KM
+    server.Get("/api/jobs", [](const httplib::Request &req, httplib::Response &res) {
+        double latitude, longitude;
+        if (!readLocation(req, latitude, longitude))
+            return sendError(res, WorkerAssignment::resultMessage(WORK_BAD_LOCATION));
+
+        int workerID = 0;
+        if (req.has_param("workerID"))
+        {
+            try { workerID = std::stoi(req.get_param_value("workerID")); }
+            catch (const std::exception &) { workerID = 0; }
+        }
+
+        std::lock_guard<std::mutex> guard(spotsLock);
+
+        json list = json::array();
+        for (const SpotDistance &job : WorkerAssignment::findJobs(spots, latitude, longitude, workerID))
+        {
+            json item = spotToJson(job.spot);
+            item["distanceKm"] = job.distance;
+            list.push_back(item);
+        }
+
+        res.set_content(list.dump(), "application/json");
+    });
+
+    // Section 13: a worker applies {"workerID", "spotID", "latitude", "longitude"}
+    server.Post("/api/apply", [](const httplib::Request &req, httplib::Response &res) {
+        json body;
+        if (!readBody(req, body))
+            return sendError(res, "Send the application as JSON.");
+
+        int workerID = positiveField(body, "workerID");
+        int spotID = positiveField(body, "spotID");
+        double latitude, longitude;
+
+        if (workerID == 0)
+            return sendError(res, "Enter your worker ID.");
+
+        if (!numberField(body, "latitude", latitude) || !numberField(body, "longitude", longitude))
+            return sendError(res, "Share your location or type your latitude and longitude.");
+
+        std::lock_guard<std::mutex> guard(spotsLock);
+
+        WasteSpot *spot = spots.findSpot(spotID);
+        if (spot == nullptr)
+            return sendWorkError(res, WORK_NO_SPOT);
+
+        // applyForSpot goes City -> Locality -> spot, like the terminal menu.
+        // Old spots may have no locality saved; the city table files those under the city name.
+        std::string locality = spot->localityName;
+        if (locality.empty())
+            locality = spot->cityName;
+
+        Worker worker(workerID, latitude, longitude, DEFAULT_WORKER_RATING);
+        WorkResult result = assignment.applyForSpot(report.getCityTable(), spot->cityName,
+                                                    locality, spotID, worker);
+
+        if (result != WORK_OK)
+            return sendWorkError(res, result);
+
+        json reply = spotToJson(spot);
+        reply["distanceKm"] = spot->applicantHead->getDistance();  // the new applicant is at the front
+        res.set_content(reply.dump(), "application/json");
+    });
+
+    // Applicants of a spot for the moderator, best first: ?spotID=..
+    server.Get("/api/applicants", [](const httplib::Request &req, httplib::Response &res) {
+        int spotID = 0;
+        try { spotID = std::stoi(req.get_param_value("spotID")); }
+        catch (const std::exception &) { spotID = 0; }
+
+        std::lock_guard<std::mutex> guard(spotsLock);
+
+        WasteSpot *spot = spots.findSpot(spotID);
+        if (spot == nullptr)
+            return sendWorkError(res, WORK_NO_SPOT);
+
+        res.set_content(rankedApplicants(spot).dump(), "application/json");
+    });
+
+    // Section 14: the priority queue picks the best applicants {"spotID"}
+    server.Post("/api/assign", [](const httplib::Request &req, httplib::Response &res) {
+        json body;
+        if (!readBody(req, body))
+            return sendError(res, "Send the spot as JSON.");
+
+        int spotID = positiveField(body, "spotID");
+
+        std::lock_guard<std::mutex> guard(spotsLock);
+
+        WorkResult result = assignment.assignWorkers(spots, spotID);
+
+        if (result != WORK_OK)
+            return sendWorkError(res, result);
+
+        WasteSpot *spot = spots.findSpot(spotID);
+        json reply = spotToJson(spot);
+        reply["ranked"] = rankedApplicants(spot);
+        res.set_content(reply.dump(), "application/json");
     });
 
     // Photo of a spot, wherever it was saved (uploads/ or a path typed in the terminal app)

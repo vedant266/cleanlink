@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CleanLink · Work</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+
+  <div>
+    <div class="band slim">
+      <div class="top">
+        <a href="./">CleanLink</a>
+        <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html">Donate</a><a href="moderate.html">Moderate</a><a href="work.html" aria-current="page">Work</a></nav>
+      </div>
+    </div>
+    <h1 class="title">Work</h1>
+    <p class="lead">Funded cleanup jobs within 20 km of you, nearest first. Apply for the ones you can
+       do; a moderator then picks the workers: the closest first, then by rating, then who applied first.
+       Each job pays Rs 500 per worker.</p>
+  </div>
+
+  <form class="paper short" id="find">
+    <h2>Find jobs near you</h2>
+
+    <div class="row">
+      <label class="small field">Worker ID
+        <input name="workerID" type="number" min="1" placeholder="401" required>
+      </label>
+      <div class="small">Your location
+        <button type="button" class="locate" id="locate">Use my location</button>
+        <span class="locnote" id="locNote"></span>
+      </div>
+    </div>
+
+    <div class="row">
+      <label class="small field">Latitude
+        <input name="latitude" type="number" step="any" min="-90" max="90" placeholder="30.3165" required>
+      </label>
+      <label class="small field">Longitude
+        <input name="longitude" type="number" step="any" min="-180" max="180" placeholder="78.0322" required>
+      </label>
+    </div>
+
+    <div class="submit">
+      <span class="msg" id="msg"></span>
+      <button>Find jobs &rarr;</button>
+    </div>
+  </form>
+
+  <section class="spots one">
+    <h2>Jobs near you</h2>
+    <ul class="jobs" id="jobs">
+      <li class="empty">Enter your worker ID and location to see funded jobs near you.</li>
+    </ul>
+  </section>
+
+</div>
+
+<script src="common.js"></script>
+<script>
+  const find = document.getElementById('find');
+  const msg = document.getElementById('msg');
+  const jobsList = document.getElementById('jobs');
+  const locNote = document.getElementById('locNote');
+
+  // Remember the worker ID and last location in this browser, so they don't retype them
+  const SAVE_KEY = 'cleanlink.worker';
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); } catch { saved = {}; }
+  for (const key of ['workerID', 'latitude', 'longitude'])
+    if (saved[key]) find.elements[key].value = saved[key];
+
+  function worker() {
+    return {
+      workerID: Number(find.elements.workerID.value),
+      latitude: Number(find.elements.latitude.value),
+      longitude: Number(find.elements.longitude.value),
+    };
+  }
+
+  // The browser asks "Allow location?". Phones use real GPS; laptops use Wi-Fi, which is rougher.
+  document.getElementById('locate').addEventListener('click', () => {
+    if (!window.isSecureContext || !navigator.geolocation) {
+      locNote.textContent = 'Automatic location only works on https:// or localhost. Type it below.';
+      return;
+    }
+    locNote.textContent = 'Asking for your location…';
+    navigator.geolocation.getCurrentPosition(pos => {
+      find.elements.latitude.value = pos.coords.latitude.toFixed(6);
+      find.elements.longitude.value = pos.coords.longitude.toFixed(6);
+      locNote.textContent = `Found you (to within about ${Math.round(pos.coords.accuracy)} m).`;
+      if (find.elements.workerID.value) find.requestSubmit();
+    }, err => {
+      locNote.textContent = err.code === err.PERMISSION_DENIED
+        ? 'Location is blocked for this site. Type your latitude and longitude below.'
+        : 'Could not get your location. Type it below.';
+    }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 });
+  });
+
+  async function loadJobs(note) {
+    const w = worker();
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(w)); } catch { /* private window: just don't remember */ }
+
+    let res, jobs;
+    try {
+      res = await fetch(`/api/jobs?lat=${w.latitude}&lon=${w.longitude}&workerID=${w.workerID}`);
+      jobs = await res.json();
+    } catch {
+      msg.textContent = 'Could not reach the server. Is it running?';
+      return;
+    }
+    if (!res.ok) { msg.textContent = jobs.error; return; }
+
+    msg.textContent = note || `${jobs.length} job${jobs.length === 1 ? '' : 's'} within 20 km, nearest first.`;
+
+    if (!jobs.length) {
+      jobsList.innerHTML = '<li class="empty">No funded jobs within 20 km right now, or you have applied for all of them.</li>';
+      return;
+    }
+
+    jobsList.innerHTML = jobs.map(j => `
+      <li class="job">
+        <img src="/api/photo/${j.id}" alt="">
+        <div>
+          <b>#${j.id} ${esc(j.wasteType)} <small>(${j.size.toLowerCase()})</small></b>
+          <em>${esc(j.city)}, ${esc(j.locality)} · <a href="${mapsLink(j)}" target="_blank">map ↗</a></em>
+          <em>needs ${j.workersNeeded} worker${j.workersNeeded === 1 ? '' : 's'} · ${j.applicants} applied · ${rs(WAGE)} each</em>
+        </div>
+        <div class="side">
+          <span class="km">${j.distanceKm.toFixed(1)} km</span>
+          <button class="btn" data-apply="${j.id}">Apply</button>
+        </div>
+      </li>`).join('');
+  }
+
+  find.addEventListener('submit', (e) => {
+    e.preventDefault();
+    loadJobs();
+  });
+
+  jobsList.addEventListener('click', async (e) => {
+    const button = e.target.closest('[data-apply]');
+    if (!button) return;
+    button.disabled = true;
+    button.textContent = 'Applying…';
+    try {
+      const s = await post('/api/apply', { ...worker(), spotID: Number(button.dataset.apply) });
+      await loadJobs(`Applied for spot #${s.id} (${s.distanceKm.toFixed(1)} km away). A moderator picks the workers.`);
+    } catch (err) {
+      msg.textContent = err.message;
+      button.disabled = false;
+      button.textContent = 'Apply';
+    }
+  });
+
+  // Came back with a saved ID and location: show the jobs straight away
+  if (saved.workerID && saved.latitude && saved.longitude) loadJobs();
+</script>
+</body>
+</html>

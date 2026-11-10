@@ -49,11 +49,15 @@ function fundBlock(s, from) {
   }
 
   const left = s.cleanupCost - s.fundedAmount;
+  const done = { Funded: 'Fully funded. Waiting for workers.', Assigned: 'Fully funded. Workers assigned.', Completed: 'Cleaned up.' };
   return `<div class="fund">
     <div class="head"><b>${rs(s.fundedAmount)}</b><span>of ${rs(s.cleanupCost)} · ${p}%</span></div>
-    <div class="bigbar${p === 100 ? ' full' : ''}"><i id="fill" style="width:${start}%" data-to="${p}"></i></div>
-    <p>${isFunded(s) ? 'Fully funded. Ready for workers.' : `${rs(left)} to go · ${s.workersNeeded} workers × ${rs(WAGE)}`}</p></div>`;
+    <div class="bigbar${p === 100 ? ' full' : ''}"><i class="fill" style="width:${start}%" data-to="${p}"></i></div>
+    <p>${isFunded(s) ? done[s.status] : `${rs(left)} to go · ${s.workersNeeded} workers × ${rs(WAGE)}`}</p></div>`;
 }
+
+// Date and time from a saved Unix time (seconds)
+const when = t => new Date(t * 1000).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 
 // POST JSON and return the reply, or throw with the server's error message
 async function post(url, body) {
@@ -81,11 +85,14 @@ function showStats(spots) {
 // The spot list (city -> locality -> spot) and detail panel, used on every page.
 //   filter(s)   which spots appear in the list (the detail panel can still show any spot)
 //   actions(s)  HTML for this page's form in the detail panel, or ''
+//   onShow(s, detail)  runs after a spot is shown, e.g. to load more about it
 //   submit(form, spot, action)  sends that form and returns { id, note } to show afterwards
 //   empty       text when no spot passes the filter
-function spotBrowser({ filter = () => true, actions = () => '', submit = null, empty = 'No spots reported yet.' } = {}) {
-  const list = document.getElementById('list');
-  const detail = document.getElementById('detail');
+//   listId / detailId  the elements to draw into (a page can have more than one browser)
+function spotBrowser({ filter = () => true, actions = () => '', onShow = null, submit = null,
+                       empty = 'No spots reported yet.', listId = 'list', detailId = 'detail' } = {}) {
+  const list = document.getElementById(listId);
+  const detail = document.getElementById(detailId);
   let spots = [];
   let shownId = null, shownPercent = null;
 
@@ -117,14 +124,18 @@ function spotBrowser({ filter = () => true, actions = () => '', submit = null, e
         <dt>Status</dt><dd>${s.status}</dd>
         <dt>Reporter</dt><dd>${s.reporterID}</dd>
         ${s.moderatorID ? `<dt>Moderator</dt><dd>${s.moderatorID}</dd>` : ''}
+        ${s.status === 'Funded' ? `<dt>Applicants</dt><dd>${s.applicants}</dd>` : ''}
+        ${s.assignedWorkers?.length ? `<dt>Assigned</dt><dd>${s.assignedWorkers.join(', ')}</dd>` : ''}
       </dl>`;
 
     // Grow the bar to its new width on the next frame, so the change animates
-    const fill = document.getElementById('fill');
+    const fill = detail.querySelector('.fill');
     if (fill) requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = fill.dataset.to + '%'; }));
 
     shownId = id;
     shownPercent = isFunded(s) ? 100 : percent(s);
+
+    if (onShow) onShow(s, detail);
   }
 
   function renderList(visible) {
@@ -186,7 +197,7 @@ function spotBrowser({ filter = () => true, actions = () => '', submit = null, e
 
   detail.addEventListener('click', (e) => {
     // Quick amount buttons fill in the amount
-    const chip = e.target.closest('.chip');
+    const chip = e.target.closest('.chip[data-amount]');
     if (chip) detail.querySelector('input[name=amount]').value = chip.dataset.amount;
 
     // Remember Approve / Reject, for browsers without e.submitter

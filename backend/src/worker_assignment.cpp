@@ -63,6 +63,45 @@ int WorkerAssignment::countApplicants(const WasteSpot *spot)
     return count;
 }
 
+bool WorkerAssignment::hasApplied(const WasteSpot *spot, int workerID)
+{
+    for (Applicant *a = spot->applicantHead; a != nullptr; a = a->getNext())
+    {
+        if (a->getWorkerID() == workerID)
+            return true;
+    }
+
+    return false;
+}
+
+vector<SpotDistance> WorkerAssignment::findJobs(SpotList &spots, double latitude,
+                                                double longitude, int workerID)
+{
+    vector<SpotDistance> jobs;
+
+    for (WasteSpot *s = spots.getHead(); s != nullptr; s = s->next)
+    {
+        // Only spots that are paid for and still waiting for workers
+        if (s->status != FUNDED)
+            continue;
+
+        if (workerID > 0 && hasApplied(s, workerID))
+            continue;
+
+        double km = haversineDistance(s->latitude, s->longitude, latitude, longitude);
+
+        if (km > MAX_JOB_DISTANCE_KM)
+            continue;
+
+        jobs.push_back({s, km});
+    }
+
+    // Array + sorting: nearest first
+    sortSpotsByDistance(jobs.data(), (int)jobs.size());
+
+    return jobs;
+}
+
 void WorkerAssignment::loadFromFile(SpotList &spots)
 {
     FILE *fp = fopen(APPLICANT_FILE, "rb");

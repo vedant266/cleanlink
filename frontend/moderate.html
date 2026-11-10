@@ -16,12 +16,13 @@
     <div class="band slim">
       <div class="top">
         <a href="./">CleanLink</a>
-        <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html">Donate</a><a href="moderate.html" aria-current="page">Moderate</a></nav>
+        <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html">Donate</a><a href="moderate.html" aria-current="page">Moderate</a><a href="work.html">Work</a></nav>
       </div>
     </div>
     <h1 class="title">Moderate</h1>
     <p class="lead">New reports wait here. Open the map link, check the photo shows real waste at that
-       place, set the actual size, then approve or reject. You can't check your own report.</p>
+       place, set the actual size, then approve or reject. You can't check your own report.
+       Once a spot is fully funded and workers have applied, assign the best of them below.</p>
   </div>
 
   <section class="spots">
@@ -30,6 +31,14 @@
       <ul class="list" id="list"></ul>
     </div>
     <div class="detail" id="detail"></div>
+  </section>
+
+  <section class="spots">
+    <h2>Funded spots: assign workers</h2>
+    <div>
+      <ul class="list" id="fundedList"></ul>
+    </div>
+    <div class="detail" id="fundedDetail"></div>
   </section>
 
 </div>
@@ -70,6 +79,52 @@
         city: (fd.get('city') || '').trim(), locality: (fd.get('locality') || '').trim(),
       });
       return { id: s.id, note: action === 'reject' ? `Spot #${s.id} rejected.` : `Spot #${s.id} verified. Open for donations.` };
+    },
+  }).load();
+
+  // Section 14: funded spots and their applicants, in the priority queue's order
+  function assignForm(s) {
+    if (s.status !== 'Funded') return '';
+    return `<form class="act" id="assign">
+      <h3>Applicants, best first</h3>
+      <ol class="ranked"><li>Loading…</li></ol>
+      <p class="hint">Closer (in 1 km bands) first, then higher rating, then who applied first.
+         The top ${s.workersNeeded} get the job.</p>
+      <div class="buttons"><button class="btn">Assign workers &rarr;</button></div>
+      <p class="note"></p>
+    </form>`;
+  }
+
+  async function showApplicants(s, detail) {
+    const list = detail.querySelector('.ranked');
+    if (!list) return;
+    try {
+      const applicants = await (await fetch(`/api/applicants?spotID=${s.id}`)).json();
+      if (!applicants.length) {
+        list.innerHTML = '<li><span></span><span>Nobody has applied yet. Workers apply from the Work page.</span></li>';
+        detail.querySelector('#assign .btn').disabled = true;
+        return;
+      }
+      list.innerHTML = applicants.map((a, i) => `<li class="${i < s.workersNeeded ? 'pick' : ''}">
+        <span>${i + 1}.</span>
+        <span>Worker ${a.workerID} · ${a.distanceKm.toFixed(1)} km · rating ${a.rating.toFixed(1)}
+          <em>applied ${when(a.appliedAt)}</em></span></li>`).join('');
+    } catch {
+      list.innerHTML = '<li><span></span><span>Could not load the applicants.</span></li>';
+    }
+  }
+
+  spotBrowser({
+    listId: 'fundedList', detailId: 'fundedDetail',
+    filter: s => s.status === 'Funded' || s.status === 'Assigned',
+    actions: assignForm,
+    onShow: showApplicants,
+    empty: 'No funded spots yet.',
+    submit: async (form, spot) => {
+      const s = await post('/api/assign', { spotID: spot.id });
+      const n = s.assignedWorkers.length;
+      return { id: s.id, note: `Assigned ${n} of ${s.workersNeeded} worker${s.workersNeeded === 1 ? '' : 's'}: ${s.assignedWorkers.join(', ')}.`
+                               + (n < s.workersNeeded ? ' Fewer applied than the spot needs.' : '') };
     },
   }).load();
 </script>
