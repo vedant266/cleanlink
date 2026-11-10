@@ -230,6 +230,15 @@ void SpotList::display()
 
         cout << "Funded: Rs " << current->fundedAmount
              << " / Rs " << current->cleanupCost << endl;
+
+        if (current->assignedCount > 0)
+        {
+            cout << "Assigned Workers:";
+            for (int i = 0; i < current->assignedCount; i++)
+                cout << " " << current->assignedWorkers[i];
+            cout << endl;
+        }
+
         cout << "Photo: " << current->photoPath << endl;
         cout << "------------------\n";
 
