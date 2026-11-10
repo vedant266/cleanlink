@@ -5,6 +5,10 @@
 
 #define MAX_APPLICANTS 100
 
+// Workers within the same whole kilometre count as equally close,
+// so their rating can decide between them
+#define DISTANCE_BAND_KM 1.0
+
 class PriorityQueue
 {
 private:

@@ -30,12 +30,14 @@ void PriorityQueue::swap(Applicant *&a, Applicant *&b)
 // Returns true if a should come before b
 bool PriorityQueue::higherPriority(Applicant *a, Applicant *b)
 {
-    // 1. Smaller distance = higher priority
-    if (a->getDistance() < b->getDistance())
-        return true;
+    // 1. Closer = higher priority, compared in whole-kilometre bands.
+    //    Comparing exact distances meant 2.31 km always beat 2.32 km, so the
+    //    rating below was almost never looked at.
+    int bandA = (int)(a->getDistance() / DISTANCE_BAND_KM);
+    int bandB = (int)(b->getDistance() / DISTANCE_BAND_KM);
 
-    if (a->getDistance() > b->getDistance())
-        return false;
+    if (bandA != bandB)
+        return bandA < bandB;
 
     // 2. Higher rating = higher priority
     if (a->getWorkerRating() > b->getWorkerRating())
@@ -45,7 +47,11 @@ bool PriorityQueue::higherPriority(Applicant *a, Applicant *b)
         return false;
 
     // 3. Earlier application = higher priority
-    return a->getApplicationTime() < b->getApplicationTime();
+    if (a->getApplicationTime() != b->getApplicationTime())
+        return a->getApplicationTime() < b->getApplicationTime();
+
+    // 4. Same second: lower worker ID, so the order is always the same
+    return a->getWorkerID() < b->getWorkerID();
 }
 
 void PriorityQueue::heapifyUp(int index)
