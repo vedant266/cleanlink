@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <mutex>
+#include <atomic>
 #include <ctime>
 #include <cstdlib>
 #include <climits>
@@ -90,6 +91,24 @@ std::string imageExtension(const std::string &filename)
         return ext;
 
     return ".jpg";
+}
+
+// A path in uploads/ that no other upload uses. The time alone isn't enough: two
+// uploads in the same second would get the same name, and one would overwrite
+// (or, when a request is refused, delete) the other's photo.
+std::string uniqueUploadPath(const std::string &prefix, const std::string &ext)
+{
+    static std::atomic<int> counter(0);
+
+    std::string base = std::string(UPLOAD_DIR) + "/" + prefix + std::to_string(time(nullptr))
+                     + "_" + std::to_string(++counter);
+    std::string path = base + ext;
+
+    // Also skip names left from an earlier run of the server
+    for (int n = 2; access(path.c_str(), F_OK) == 0; n++)
+        path = base + "_" + std::to_string(n) + ext;
+
+    return path;
 }
 
 // Send an image file from disk, or 404 if it isn't there
@@ -279,12 +298,7 @@ int main(int argc, char *argv[])
 
         // Save the uploaded photo into uploads/
         auto photo = req.get_file_value("photo");
-        std::string ext = ".jpg";
-        size_t dot = photo.filename.rfind('.');
-        if (dot != std::string::npos)
-            ext = photo.filename.substr(dot);
-
-        std::string photoPath = std::string(UPLOAD_DIR) + "/spot_" + std::to_string(time(nullptr)) + ext;
+        std::string photoPath = uniqueUploadPath("spot_", imageExtension(photo.filename));
         std::ofstream(photoPath, std::ios::binary) << photo.content;
 
         // Location from the photo, or from the form if the photo has none
@@ -580,8 +594,8 @@ int main(int argc, char *argv[])
 
         std::string note = req.get_file_value("note").content;
         auto photo = req.get_file_value("photo");
-        std::string photoPath = std::string(UPLOAD_DIR) + "/proof_" + std::to_string(spotID) + "_"
-                              + std::to_string(time(nullptr)) + imageExtension(photo.filename);
+        std::string photoPath = uniqueUploadPath("proof_" + std::to_string(spotID) + "_",
+                                                 imageExtension(photo.filename));
 
         std::lock_guard<std::mutex> guard(spotsLock);
 
