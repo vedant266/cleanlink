@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CleanLink · Log in</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="top">
+    <a class="brand" href="./">CleanLink</a>
+    <nav><a href="./">Home</a><a href="report.html">Report</a><a href="donate.html">Donate</a><a href="moderate.html">Moderate</a><a href="work.html">Work</a></nav>
+  </header>
+
+  <div class="auth">
+    <form class="form" id="login">
+      <h1>Log in</h1>
+      <label>Username <input name="username" autocomplete="username" required></label>
+      <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+      <div class="submit"><button>Log in</button><span class="msg"></span></div>
+    </form>
+
+    <form class="form" id="signup">
+      <h1>Sign up</h1>
+      <label>Username <input name="username" autocomplete="username" minlength="3" maxlength="31" required></label>
+      <label>Password <input name="password" type="password" autocomplete="new-password" minlength="8" required></label>
+      <fieldset>
+        <legend>I am a</legend>
+        <div class="sizes">
+          <label><input type="radio" name="role" value="user" checked><span>User<small>report and donate</small></span></label>
+          <label><input type="radio" name="role" value="worker"><span>Worker<small>apply for cleanup jobs</small></span></label>
+        </div>
+      </fieldset>
+      <p class="lead">Moderators are added by whoever runs CleanLink.</p>
+      <div class="submit"><button>Sign up</button><span class="msg"></span></div>
+    </form>
+  </div>
+
+</div>
+
+<script src="common.js"></script>
+<script>
+  // Both forms send JSON and, when it works, go back home logged in
+  for (const form of document.querySelectorAll('form')) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msg = form.querySelector('.msg');
+      const button = form.querySelector('button');
+      button.disabled = true;
+      msg.textContent = '';
+      try {
+        await post(`/api/${form.id}`, Object.fromEntries(new FormData(form)));
+        location.href = './';
+      } catch (err) {
+        msg.textContent = err.message;
+        button.disabled = false;
+      }
+    });
+  }
+</script>
+</body>
+</html>

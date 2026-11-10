@@ -20,6 +20,9 @@
 #include "verification.h"
 #include "worker_assignment.h"
 #include "completion.h"
+#include "user_table.h"
+#include "chained_hash.h"
+#include "password.h"
 
 using json = nlohmann::json;
 
@@ -33,6 +36,13 @@ Verification verification;
 WorkerAssignment assignment;
 TaskCompletion completion;
 std::mutex spotsLock; // one change to the spots at a time
+
+UserTable users;
+// Logged-in browsers: cookie token -> their user. Kept in memory only, so a
+// restart logs everyone out.
+// shortcut: sessions never expire on the server, only on logout or restart.
+ChainedHashTable<User *> sessions;
+std::mutex usersLock; // guards users and sessions
 
 json spotToJson(const WasteSpot *spot)
 {
@@ -235,6 +245,78 @@ bool numberField(const json &body, const char *key, double &value)
     return true;
 }
 
+json userToJson(const User *user)
+{
+    return {{"id", user->getID()}, {"username", user->getUsername()}, {"role", user->roleName()}};
+}
+
+// The "session" cookie's value, or "". Cookies come as "a=1; session=abc; b=2".
+std::string sessionToken(const httplib::Request &req)
+{
+    std::string cookies = req.get_header_value("Cookie");
+    size_t start = 0;
+
+    while (start < cookies.size())
+    {
+        size_t end = cookies.find(';', start);
+        if (end == std::string::npos)
+            end = cookies.size();
+
+        size_t name = cookies.find_first_not_of(' ', start);
+        if (name < end && cookies.compare(name, 8, "session=") == 0)
+            return cookies.substr(name + 8, end - name - 8);
+
+        start = end + 1;
+    }
+    return "";
+}
+
+// Who is logged in on this browser, or nullptr.
+// Users are never deleted while the server runs, so the pointer stays valid.
+User *currentUser(const httplib::Request &req)
+{
+    std::lock_guard<std::mutex> guard(usersLock);
+    User **user = sessions.find(sessionToken(req));
+    return user ? *user : nullptr;
+}
+
+// The logged-in user as a T (Reporter, Donor, Worker, Moderator). dynamic_cast
+// answers "is this user a T?", so a Citizen passes as both Reporter and Donor.
+// On nullptr the 401 / 403 error has already been sent.
+template <typename T>
+T *loggedInAs(const httplib::Request &req, httplib::Response &res, const char *wrongRole)
+{
+    User *user = currentUser(req);
+    if (user == nullptr)
+    {
+        sendError(res, "Log in first.");
+        res.status = 401;
+        return nullptr;
+    }
+
+    T *asRole = dynamic_cast<T *>(user);
+    if (asRole == nullptr)
+    {
+        sendError(res, wrongRole);
+        res.status = 403;
+    }
+    return asRole;
+}
+
+// Call with usersLock held
+void startSession(const httplib::Request &req, httplib::Response &res, User *user)
+{
+    std::string token = randomHex(32);
+    sessions.insert(token, user);
+
+    // HttpOnly: page scripts can't read it. SameSite=Lax: other sites can't post with it.
+    std::string cookie = "session=" + token + "; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800";
+    // Render puts HTTPS in front of us; then the cookie must never go over plain HTTP
+    if (req.get_header_value("X-Forwarded-Proto") == "https")
+        cookie += "; Secure";
+    res.set_header("Set-Cookie", cookie);
+}
+
 // Same rule as the other routes: a failed save is the server's fault (500)
 void sendWorkError(httplib::Response &res, WorkResult result)
 {
@@ -271,6 +353,8 @@ int main(int argc, char *argv[])
     // "Work is done" proofs and the moderators' decisions
     completion.loadFromFile();
 
+    users.loadFromFile();
+
     httplib::Server server;
 
     // List all reported spots
@@ -284,17 +368,83 @@ int main(int argc, char *argv[])
         res.set_content(list.dump(), "application/json");
     });
 
-    // Report a new spot (form with an uploaded photo)
+    // Make an account and log in: {"username", "password", "role": "user" | "worker"}
+    server.Post("/api/signup", [](const httplib::Request &req, httplib::Response &res) {
+        json body;
+        if (!readBody(req, body))
+            return sendError(res, "Send the account as JSON.");
+
+        // Anyone could pick moderator here, so moderators are made in the terminal app
+        std::string role = textField(body, "role");
+        if (role != "user" && role != "worker")
+            return sendError(res, UserTable::resultMessage(USER_BAD_ROLE));
+
+        std::lock_guard<std::mutex> guard(usersLock);
+
+        User *user;
+        UserResult result = users.signUp(textField(body, "username"), textField(body, "password"),
+                                         role, user);
+        if (result != USER_OK)
+        {
+            sendError(res, UserTable::resultMessage(result));
+            if (result == USER_SAVE_FAILED)
+                res.status = 500;
+            return;
+        }
+
+        startSession(req, res, user);
+        res.set_content(userToJson(user).dump(), "application/json");
+    });
+
+    // {"username", "password"}
+    server.Post("/api/login", [](const httplib::Request &req, httplib::Response &res) {
+        json body;
+        if (!readBody(req, body))
+            return sendError(res, "Send the login as JSON.");
+
+        std::lock_guard<std::mutex> guard(usersLock);
+
+        User *user = users.logIn(textField(body, "username"), textField(body, "password"));
+        if (user == nullptr)
+        {
+            sendError(res, "Wrong username or password.");
+            res.status = 401;
+            return;
+        }
+
+        startSession(req, res, user);
+        res.set_content(userToJson(user).dump(), "application/json");
+    });
+
+    server.Post("/api/logout", [](const httplib::Request &req, httplib::Response &res) {
+        {
+            std::lock_guard<std::mutex> guard(usersLock);
+            sessions.remove(sessionToken(req));
+        }
+        res.set_header("Set-Cookie", "session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+        res.set_content("{}", "application/json");
+    });
+
+    // Who is logged in: the user, or null
+    server.Get("/api/me", [](const httplib::Request &req, httplib::Response &res) {
+        User *user = currentUser(req);
+        res.set_content(user ? userToJson(user).dump() : "null", "application/json");
+    });
+
+    // Report a new spot (form with an uploaded photo). The reporter is the logged-in user.
     server.Post("/api/report", [](const httplib::Request &req, httplib::Response &res) {
+        Reporter *reporter = loggedInAs<Reporter>(req, res, "Only user accounts can report spots.");
+        if (reporter == nullptr)
+            return;
+
         if (!req.has_file("photo") || req.get_file_value("photo").content.empty())
             return sendError(res, "Upload a photo of the spot.");
 
-        std::string reporter = req.get_file_value("reporterID").content;
         std::string wasteType = req.get_file_value("wasteType").content;
         std::string sizeValue = req.get_file_value("size").content;
 
-        if (reporter.empty() || wasteType.empty() || sizeValue.empty())
-            return sendError(res, "Fill in reporter ID, waste type and size.");
+        if (wasteType.empty() || sizeValue.empty())
+            return sendError(res, "Fill in waste type and size.");
 
         // Save the uploaded photo into uploads/
         auto photo = req.get_file_value("photo");
@@ -334,7 +484,7 @@ int main(int argc, char *argv[])
 
         std::lock_guard<std::mutex> guard(spotsLock);
 
-        int id = report.saveReport(spots, std::stoi(reporter), latitude, longitude,
+        int id = report.saveReport(spots, reporter->getID(), latitude, longitude,
                                    photoPath.c_str(), wasteType.c_str(),
                                    (WasteSize)std::stoi(sizeValue));
 
@@ -351,23 +501,23 @@ int main(int argc, char *argv[])
                 res.set_content(spotToJson(s).dump(), "application/json");
     });
 
-    // Moderator checks a pending report: {"moderatorID", "spotID", "action": "approve" | "reject",
+    // The logged-in moderator checks a pending report: {"spotID", "action": "approve" | "reject",
     // "size": 0-2, and "city" + "locality" only when the spot's city came back "Unknown"}
     server.Post("/api/verify", [](const httplib::Request &req, httplib::Response &res) {
+        Moderator *loggedIn = loggedInAs<Moderator>(req, res, "Only moderator accounts can check reports.");
+        if (loggedIn == nullptr)
+            return;
+
         json body;
         if (!readBody(req, body))
             return sendError(res, "Send the check as JSON.");
 
-        int moderatorID = positiveField(body, "moderatorID");
         int spotID = positiveField(body, "spotID");
         std::string action = textField(body, "action");
 
-        if (moderatorID == 0)
-            return sendError(res, "Enter your moderator ID.");
-
         std::lock_guard<std::mutex> guard(spotsLock);
 
-        Moderator moderator(moderatorID);
+        const Moderator &moderator = *loggedIn;
         VerifyResult result;
 
         if (action == "reject")
@@ -412,18 +562,18 @@ int main(int argc, char *argv[])
         res.set_content(spotToJson(spots.findSpot(spotID)).dump(), "application/json");
     });
 
-    // Donor gives money to a verified spot: {"donorID", "spotID", "amount"}
+    // The logged-in donor gives money to a verified spot: {"spotID", "amount"}
     server.Post("/api/donate", [](const httplib::Request &req, httplib::Response &res) {
+        Donor *donor = loggedInAs<Donor>(req, res, "Only user accounts can donate.");
+        if (donor == nullptr)
+            return;
+
         json body;
         if (!readBody(req, body))
             return sendError(res, "Send the donation as JSON.");
 
-        int donorID = positiveField(body, "donorID");
         int spotID = positiveField(body, "spotID");
         int amount = positiveField(body, "amount");
-
-        if (donorID == 0)
-            return sendError(res, "Enter your donor ID.");
 
         std::lock_guard<std::mutex> guard(spotsLock);
 
@@ -438,7 +588,7 @@ int main(int argc, char *argv[])
             locality = spot->cityName;
 
         FundResult result = funding.fundSpot(report.getCityTable(), spots, spot->cityName,
-                                             locality, spotID, Donor(donorID), amount);
+                                             locality, spotID, *donor, amount);
 
         if (result != FUND_OK)
         {
@@ -451,19 +601,15 @@ int main(int argc, char *argv[])
         res.set_content(spotToJson(spot).dump(), "application/json");
     });
 
-    // Section 12: jobs for a worker at ?lat=..&lon=.. (and &workerID=.. to leave out
-    // spots they already applied for), nearest first, within MAX_JOB_DISTANCE_KM
+    // Section 12: jobs near ?lat=..&lon=.., nearest first, within MAX_JOB_DISTANCE_KM.
+    // A logged-in worker doesn't see the spots they already applied for.
     server.Get("/api/jobs", [](const httplib::Request &req, httplib::Response &res) {
         double latitude, longitude;
         if (!readLocation(req, latitude, longitude))
             return sendError(res, WorkerAssignment::resultMessage(WORK_BAD_LOCATION));
 
-        int workerID = 0;
-        if (req.has_param("workerID"))
-        {
-            try { workerID = std::stoi(req.get_param_value("workerID")); }
-            catch (const std::exception &) { workerID = 0; }
-        }
+        Worker *worker = dynamic_cast<Worker *>(currentUser(req));
+        int workerID = worker ? worker->getID() : 0;
 
         std::lock_guard<std::mutex> guard(spotsLock);
 
@@ -478,18 +624,19 @@ int main(int argc, char *argv[])
         res.set_content(list.dump(), "application/json");
     });
 
-    // Section 13: a worker applies {"workerID", "spotID", "latitude", "longitude"}
+    // Section 13: the logged-in worker applies {"spotID", "latitude", "longitude"}
     server.Post("/api/apply", [](const httplib::Request &req, httplib::Response &res) {
+        Worker *account = loggedInAs<Worker>(req, res, "Only worker accounts can apply for jobs.");
+        if (account == nullptr)
+            return;
+
         json body;
         if (!readBody(req, body))
             return sendError(res, "Send the application as JSON.");
 
-        int workerID = positiveField(body, "workerID");
+        int workerID = account->getID();
         int spotID = positiveField(body, "spotID");
         double latitude, longitude;
-
-        if (workerID == 0)
-            return sendError(res, "Enter your worker ID.");
 
         if (!numberField(body, "latitude", latitude) || !numberField(body, "longitude", longitude))
             return sendError(res, "Share your location or type your latitude and longitude.");
@@ -520,6 +667,10 @@ int main(int argc, char *argv[])
 
     // Applicants of a spot for the moderator, best first: ?spotID=..
     server.Get("/api/applicants", [](const httplib::Request &req, httplib::Response &res) {
+        // Each applicant's distance hints where they live, so only moderators see it
+        if (loggedInAs<Moderator>(req, res, "Only moderator accounts can see applicants.") == nullptr)
+            return;
+
         int spotID = 0;
         try { spotID = std::stoi(req.get_param_value("spotID")); }
         catch (const std::exception &) { spotID = 0; }
@@ -535,6 +686,9 @@ int main(int argc, char *argv[])
 
     // Section 14: the priority queue picks the best applicants {"spotID"}
     server.Post("/api/assign", [](const httplib::Request &req, httplib::Response &res) {
+        if (loggedInAs<Moderator>(req, res, "Only moderator accounts can assign workers.") == nullptr)
+            return;
+
         json body;
         if (!readBody(req, body))
             return sendError(res, "Send the spot as JSON.");
@@ -579,15 +733,18 @@ int main(int argc, char *argv[])
         sendImage(res, path);
     });
 
-    // Section 18: an assigned worker sends the "after" photo (form: workerID, spotID, note, photo)
+    // Section 18: the logged-in, assigned worker sends the "after" photo (form: spotID, note, photo)
     server.Post("/api/proof", [](const httplib::Request &req, httplib::Response &res) {
+        Worker *worker = loggedInAs<Worker>(req, res, "Only worker accounts can send work photos.");
+        if (worker == nullptr)
+            return;
+
         if (!req.has_file("photo") || req.get_file_value("photo").content.empty())
             return sendDoneError(res, DONE_NO_PHOTO);
 
-        int workerID = 0, spotID = 0;
+        int workerID = worker->getID(), spotID = 0;
         try
         {
-            workerID = std::stoi(req.get_file_value("workerID").content);
             spotID = std::stoi(req.get_file_value("spotID").content);
         }
         catch (const std::exception &) {}
@@ -622,13 +779,17 @@ int main(int argc, char *argv[])
     });
 
     // Sections 19 + 21: a moderator compares before/after
-    // {"moderatorID", "spotID", "action": "approve" | "reject", "reason"}
+    // {"spotID", "action": "approve" | "reject", "reason"}, by the logged-in moderator
     server.Post("/api/check", [](const httplib::Request &req, httplib::Response &res) {
+        Moderator *loggedIn = loggedInAs<Moderator>(req, res, "Only moderator accounts can check work.");
+        if (loggedIn == nullptr)
+            return;
+
         json body;
         if (!readBody(req, body))
             return sendError(res, "Send the check as JSON.");
 
-        Moderator moderator(positiveField(body, "moderatorID"));
+        const Moderator &moderator = *loggedIn;
         int spotID = positiveField(body, "spotID");
         std::string action = textField(body, "action");
 
@@ -648,15 +809,14 @@ int main(int argc, char *argv[])
         res.set_content(spotToJson(spots.findSpot(spotID)).dump(), "application/json");
     });
 
-    // A worker's own jobs: ?workerID=.. Each comes with "myState":
+    // The logged-in worker's own jobs. Each comes with "myState":
     // applied, not-picked, todo, redo (a moderator rejected the photo), checking, done
     server.Get("/api/myjobs", [](const httplib::Request &req, httplib::Response &res) {
-        int workerID = 0;
-        try { workerID = std::stoi(req.get_param_value("workerID")); }
-        catch (const std::exception &) { workerID = 0; }
+        Worker *worker = loggedInAs<Worker>(req, res, "Only worker accounts have jobs.");
+        if (worker == nullptr)
+            return;
 
-        if (workerID < 1)
-            return sendDoneError(res, DONE_BAD_WORKER);
+        int workerID = worker->getID();
 
         std::lock_guard<std::mutex> guard(spotsLock);
 

@@ -78,6 +78,23 @@ async function post(url, body) {
   return data;
 }
 
+// Who is logged in on this browser: { id, username, role } or null
+const me = fetch('/api/me').then(r => r.json()).catch(() => null);
+
+// Header: the logged-in user with a Log out button, or a Log in link
+me.then(user => {
+  const who = document.createElement('div');
+  who.className = 'who';
+  who.innerHTML = user
+    ? `<span><b>${esc(user.username)}</b> · ${esc(user.role)}</span><button type="button">Log out</button>`
+    : '<a href="login.html">Log in</a>';
+  who.querySelector('button')?.addEventListener('click', async () => {
+    await post('/api/logout', {});
+    location.href = './';
+  });
+  document.querySelector('.top').append(who);
+});
+
 // Spot / city / money counts, on pages that have them (the home page)
 function showStats(spots) {
   const count = document.getElementById('count');

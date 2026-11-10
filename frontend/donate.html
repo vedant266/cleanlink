@@ -34,7 +34,6 @@
       .map(a => `<button type="button" class="chip" data-amount="${a}">${rs(a)}</button>`).join('');
     return `<form class="act" id="donate">
       <h3>Donate</h3>
-      <label>Donor ID <input class="text" name="donorID" type="number" min="1" placeholder="301" required></label>
       <label>Amount (Rs) <input class="text" name="amount" type="number" min="1" max="${left}" placeholder="${left}" required></label>
       <div class="chips">${chips}<button type="button" class="chip" data-amount="${left}">Rest · ${rs(left)}</button></div>
       <div class="buttons"><button class="btn">Donate &rarr;</button></div>
@@ -50,7 +49,7 @@
     submit: async (form, spot) => {
       const fd = new FormData(form);
       const s = await post('/api/donate', {
-        spotID: spot.id, donorID: Number(fd.get('donorID')), amount: Number(fd.get('amount')),
+        spotID: spot.id, amount: Number(fd.get('amount')),
       });
       return { id: s.id, note: s.status === 'Funded' ? `Spot #${s.id} is now fully funded!` : 'Thank you! Donation saved.' };
     },

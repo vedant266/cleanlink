@@ -24,10 +24,6 @@
   <form class="form" id="find">
     <h2>Find jobs near you</h2>
 
-    <label>Worker ID
-      <input name="workerID" type="number" min="1" placeholder="401" required>
-    </label>
-
     <div class="submit">
       <button type="button" class="ghost" id="locate">Use my location</button>
       <span class="locnote" id="locNote"></span>
@@ -51,14 +47,14 @@
   <section class="spots one">
     <h2>My jobs</h2>
     <ul class="mine" id="mine">
-      <li class="empty">Enter your worker ID to see the jobs you applied for.</li>
+      <li class="empty">Log in as a worker to see the jobs you applied for.</li>
     </ul>
   </section>
 
   <section class="spots one">
     <h2>Jobs near you</h2>
     <ul class="jobs" id="jobs">
-      <li class="empty">Enter your worker ID and location to see funded jobs near you.</li>
+      <li class="empty">Enter your location to see funded jobs near you.</li>
     </ul>
   </section>
 
@@ -71,16 +67,15 @@
   const jobsList = document.getElementById('jobs');
   const locNote = document.getElementById('locNote');
 
-  // Remember the worker ID and last location in this browser, so they don't retype them
+  // Remember the last location in this browser, so they don't retype it
   const SAVE_KEY = 'cleanlink.worker';
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); } catch { saved = {}; }
-  for (const key of ['workerID', 'latitude', 'longitude'])
+  for (const key of ['latitude', 'longitude'])
     if (saved[key]) find.elements[key].value = saved[key];
 
   function worker() {
     return {
-      workerID: Number(find.elements.workerID.value),
       latitude: Number(find.elements.latitude.value),
       longitude: Number(find.elements.longitude.value),
     };
@@ -97,7 +92,7 @@
       find.elements.latitude.value = pos.coords.latitude.toFixed(6);
       find.elements.longitude.value = pos.coords.longitude.toFixed(6);
       locNote.textContent = `Found you (to within about ${Math.round(pos.coords.accuracy)} m).`;
-      if (find.elements.workerID.value) find.requestSubmit();
+      find.requestSubmit();
     }, err => {
       locNote.textContent = err.code === err.PERMISSION_DENIED
         ? 'Location is blocked for this site. Type your latitude and longitude below.'
@@ -111,7 +106,7 @@
 
     let res, jobs;
     try {
-      res = await fetch(`/api/jobs?lat=${w.latitude}&lon=${w.longitude}&workerID=${w.workerID}`);
+      res = await fetch(`/api/jobs?lat=${w.latitude}&lon=${w.longitude}`);
       jobs = await res.json();
     } catch {
       msg.textContent = 'Could not reach the server. Is it running?';
@@ -163,12 +158,12 @@
   }
 
   async function loadMine() {
-    const id = Number(find.elements.workerID.value);
-    if (!id) return;
+    // Jobs belong to the logged-in worker
+    if ((await me)?.role !== 'worker') return;
 
     let res, list;
     try {
-      res = await fetch(`/api/myjobs?workerID=${id}`);
+      res = await fetch('/api/myjobs');
       list = await res.json();
     } catch {
       mine.innerHTML = '<li class="empty">Could not reach the server. Is it running?</li>';
@@ -201,7 +196,6 @@
     const note = form.querySelector('.note');
     const button = form.querySelector('button');
     const data = new FormData(form);
-    data.append('workerID', find.elements.workerID.value);
     data.append('spotID', form.dataset.spot);
 
     button.disabled = true;
@@ -249,8 +243,8 @@
   });
 
   // Came back with a saved ID and location: show the jobs straight away
-  if (saved.workerID) loadMine();
-  if (saved.workerID && saved.latitude && saved.longitude) loadJobs();
+  loadMine();
+  if (saved.latitude && saved.longitude) loadJobs();
 </script>
 </body>
 </html>

@@ -22,6 +22,14 @@ a { color: var(--accent); }
 .top nav a { color: var(--muted); text-decoration: none; }
 .top nav a:hover { color: var(--text); }
 .top nav a[aria-current="page"] { color: var(--text); font-weight: 600; }
+.who { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+.who b { color: var(--text); font-weight: 500; }
+.who button { padding: 3px 10px; font-size: 13px; background: #fff; color: var(--text); border-color: #bbb; }
+
+/* login page: the two forms side by side */
+.auth { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
+.auth h1 { font-size: 22px; margin: 0; }
+.auth .lead { margin: 0; font-size: 14px; }
 
 h1 { font-size: 28px; margin: 0 0 6px; }
 h2 { font-size: 18px; margin: 0; }
@@ -133,7 +141,7 @@ button:disabled { opacity: .5; cursor: wait; }
 .locnote { font-size: 13px; color: var(--muted); }
 
 @media (max-width: 720px) {
-  .spots, .row, .proof { grid-template-columns: 1fr; }
+  .spots, .row, .proof, .auth { grid-template-columns: 1fr; }
   .job { grid-template-columns: 72px minmax(0, 1fr); }
   .job img { width: 72px; height: 54px; }
   .job .side { grid-column: 1 / -1; justify-content: space-between; }

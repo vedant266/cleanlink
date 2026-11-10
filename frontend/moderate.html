@@ -58,7 +58,6 @@
       <label>Locality <input class="text" name="locality" required></label>` : '';
     return `<form class="act" id="verify">
       <h3>Verify</h3>
-      <label>Moderator ID <input class="text" name="moderatorID" type="number" min="1" placeholder="201" required></label>
       ${place}
       <div><label>Actual size · workers · cost</label><div class="sizes">${sizes}</div></div>
       <div class="buttons">
@@ -77,7 +76,7 @@
       const fd = new FormData(form);
       action = action || 'approve';
       const s = await post('/api/verify', {
-        spotID: spot.id, moderatorID: Number(fd.get('moderatorID')), action,
+        spotID: spot.id, action,
         size: Number(fd.get('size')),
         city: (fd.get('city') || '').trim(), locality: (fd.get('locality') || '').trim(),
       });
@@ -103,6 +102,12 @@
     if (!list) return;
     try {
       const applicants = await (await fetch(`/api/applicants?spotID=${s.id}`)).json();
+      // Not logged in as a moderator: say so instead of "nobody applied"
+      if (applicants.error) {
+        list.innerHTML = `<li><span></span><span>${esc(applicants.error)}</span></li>`;
+        detail.querySelector('#assign .btn').disabled = true;
+        return;
+      }
       if (!applicants.length) {
         list.innerHTML = '<li><span></span><span>Nobody has applied yet. Workers apply from the Work page.</span></li>';
         detail.querySelector('#assign .btn').disabled = true;
@@ -136,7 +141,6 @@
     if (s.status !== 'Submitted') return '';
     return `<form class="act" id="check">
       <h3>Check the work</h3>
-      <label>Moderator ID <input class="text" name="moderatorID" type="number" min="1" placeholder="201" required></label>
       <label>Reason, if you reject it <textarea class="text" name="reason" maxlength="190"
         placeholder="e.g. waste still visible on the left"></textarea></label>
       <div class="buttons">
@@ -163,7 +167,7 @@
       const fd = new FormData(form);
       action = action || 'approve';
       const s = await post('/api/check', {
-        spotID: spot.id, moderatorID: Number(fd.get('moderatorID')), action,
+        spotID: spot.id, action,
         reason: (fd.get('reason') || '').trim(),
       });
       cleaned.load();

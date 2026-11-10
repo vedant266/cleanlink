@@ -24,14 +24,9 @@
     </label>
     <img class="thumb" id="thumb" alt="Selected photo" hidden>
 
-    <div class="row">
-      <label>Reporter ID
-        <input name="reporterID" type="number" min="1" placeholder="101" required>
-      </label>
-      <label>Waste type
-        <input name="wasteType" placeholder="plastic" required>
-      </label>
-    </div>
+    <label>Waste type
+      <input name="wasteType" placeholder="plastic" required>
+    </label>
 
     <fieldset>
       <legend>Size (workers needed)</legend>
@@ -114,6 +109,7 @@
     }
   });
 
+  me.then(user => { if (user?.role !== 'user') msg.textContent = 'Log in as a user to report a spot.'; });
   browser.load();
 </script>
 </body>
