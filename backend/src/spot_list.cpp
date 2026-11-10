@@ -19,10 +19,22 @@ static bool isValidRecord(const WasteSpot &spot)
         return false;
 
     return spot.spotID >= 1 &&
-           spot.status >= PENDING && spot.status <= REJECTED &&
+           spot.status >= PENDING && spot.status <= LAST_STATUS &&
            spot.estimatedSize >= SMALL && spot.estimatedSize <= LARGE &&
            spot.workerLimit >= 0 &&
            spot.assignedCount >= 0 && spot.assignedCount <= MAX_ASSIGNED_WORKERS;
+}
+
+const char *statusName(SpotStatus status)
+{
+    // Same order as SpotStatus in waste_spot.h
+    static const char *names[] = {"Pending", "Verified", "Funded", "Assigned",
+                                  "Completed", "Rejected", "Submitted"};
+
+    if (status < PENDING || status > LAST_STATUS)
+        return "Unknown";
+
+    return names[status];
 }
 
 SpotList::SpotList()
@@ -232,7 +244,6 @@ WasteSpot *SpotList::findSpot(int spotID)
 void SpotList::display()
 {
     const char *sizeNames[] = {"Small", "Medium", "Large"};
-    const char *statusNames[] = {"Pending", "Verified", "Funded", "Assigned", "Completed", "Rejected"};
 
     cout << "\n===== WASTE SPOTS =====\n";
 
@@ -258,7 +269,7 @@ void SpotList::display()
         cout << "Waste Type: " << current->wasteType << endl;
         cout << "Size: " << sizeNames[current->estimatedSize] << endl;
         cout << "Workers Needed: " << current->workerLimit << endl;
-        cout << "Status: " << statusNames[current->status] << endl;
+        cout << "Status: " << statusName(current->status) << endl;
 
         if (current->moderatorID != 0)
             cout << "Checked by Moderator: " << current->moderatorID << endl;

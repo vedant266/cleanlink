@@ -18,6 +18,7 @@
 #include "funding.h"
 #include "verification.h"
 #include "worker_assignment.h"
+#include "completion.h"
 
 using json = nlohmann::json;
 
@@ -29,14 +30,14 @@ ReportSpot report;
 Funding funding;
 Verification verification;
 WorkerAssignment assignment;
+TaskCompletion completion;
 std::mutex spotsLock; // one change to the spots at a time
 
 json spotToJson(const WasteSpot *spot)
 {
     const char *sizeNames[] = {"Small", "Medium", "Large"};
-    const char *statusNames[] = {"Pending", "Verified", "Funded", "Assigned", "Completed", "Rejected"};
 
-    return {
+    json j = {
         {"id", spot->spotID},
         {"reporterID", spot->reporterID},
         {"latitude", spot->latitude},
@@ -46,7 +47,7 @@ json spotToJson(const WasteSpot *spot)
         {"wasteType", spot->wasteType},
         {"size", sizeNames[spot->estimatedSize]},
         {"workersNeeded", spot->workerLimit},
-        {"status", statusNames[spot->status]},
+        {"status", statusName(spot->status)},
         {"moderatorID", spot->moderatorID},
         {"cleanupCost", spot->cleanupCost},
         {"fundedAmount", spot->fundedAmount},
@@ -56,6 +57,68 @@ json spotToJson(const WasteSpot *spot)
                                              spot->assignedWorkers + spot->assignedCount)},
         {"photo", spot->photoPath}
     };
+
+    // Sections 18-19: the newest "work is done" proof, if there is one
+    if (const ProofRecord *p = completion.latestProof(spot->spotID))
+    {
+        j["proof"] = {
+            {"workerID", p->workerID},
+            {"note", p->note},
+            {"submittedAt", p->submittedAt},
+            {"status", TaskCompletion::proofStatusName(p->status)},
+            {"moderatorID", p->moderatorID},
+            {"reason", p->reason},
+            {"checkedAt", p->checkedAt}
+        };
+    }
+
+    return j;
+}
+
+// Uploaded photos keep only a known image extension, nothing else from the file name
+std::string imageExtension(const std::string &filename)
+{
+    std::string ext;
+    size_t dot = filename.rfind('.');
+    if (dot != std::string::npos)
+        ext = filename.substr(dot);
+
+    for (char &c : ext)
+        c = (char)tolower((unsigned char)c);
+
+    if (ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".webp" || ext == ".heic")
+        return ext;
+
+    return ".jpg";
+}
+
+// Send an image file from disk, or 404 if it isn't there
+void sendImage(httplib::Response &res, const std::string &path)
+{
+    std::ifstream file(path, std::ios::binary);
+
+    if (path.empty() || !file)
+    {
+        res.status = 404;
+        return;
+    }
+
+    const char *type = "image/jpeg";
+    if (path.size() > 4 && path.compare(path.size() - 4, 4, ".png") == 0) type = "image/png";
+    if (path.size() > 5 && path.compare(path.size() - 5, 5, ".webp") == 0) type = "image/webp";
+    if (path.size() > 5 && path.compare(path.size() - 5, 5, ".heic") == 0) type = "image/heic";
+
+    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    res.set_content(content, type);
+}
+
+bool isAssignedTo(const WasteSpot *spot, int workerID)
+{
+    for (int i = 0; i < spot->assignedCount; i++)
+        if (spot->assignedWorkers[i] == workerID)
+            return true;
+
+    return false;
 }
 
 // What a moderator sees about one applicant: no GPS, only how far away they are
@@ -161,6 +224,13 @@ void sendWorkError(httplib::Response &res, WorkResult result)
         res.status = 500;
 }
 
+void sendDoneError(httplib::Response &res, DoneResult result)
+{
+    sendError(res, TaskCompletion::resultMessage(result));
+    if (result == DONE_SAVE_FAILED)
+        res.status = 500;
+}
+
 int main(int argc, char *argv[])
 {
     // Run from the repo folder so frontend/, uploads/ and the .dat file are found
@@ -178,6 +248,9 @@ int main(int argc, char *argv[])
 
     // After the spots, so each application can find its spot
     assignment.loadFromFile(spots);
+
+    // "Work is done" proofs and the moderators' decisions
+    completion.loadFromFile();
 
     httplib::Server server;
 
@@ -470,20 +543,135 @@ int main(int argc, char *argv[])
     // Photo of a spot, wherever it was saved (uploads/ or a path typed in the terminal app)
     server.Get(R"(/api/photo/(\d+))", [](const httplib::Request &req, httplib::Response &res) {
         int id = std::stoi(req.matches[1]);
-
-        for (WasteSpot *s = spots.getHead(); s != nullptr; s = s->next)
+        std::string path;
         {
-            if (s->spotID != id) continue;
+            std::lock_guard<std::mutex> guard(spotsLock);
+            WasteSpot *spot = spots.findSpot(id);
+            if (spot != nullptr)
+                path = spot->photoPath;
+        }
+        sendImage(res, path);
+    });
 
-            std::ifstream file(s->photoPath, std::ios::binary);
-            if (!file) break;
+    // The newest "after" photo a worker sent for a spot
+    server.Get(R"(/api/proof-photo/(\d+))", [](const httplib::Request &req, httplib::Response &res) {
+        int id = std::stoi(req.matches[1]);
+        std::string path;
+        {
+            std::lock_guard<std::mutex> guard(spotsLock);
+            if (const ProofRecord *p = completion.latestProof(id))
+                path = p->photoPath;
+        }
+        sendImage(res, path);
+    });
 
-            std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-            res.set_content(content, "image/jpeg");
+    // Section 18: an assigned worker sends the "after" photo (form: workerID, spotID, note, photo)
+    server.Post("/api/proof", [](const httplib::Request &req, httplib::Response &res) {
+        if (!req.has_file("photo") || req.get_file_value("photo").content.empty())
+            return sendDoneError(res, DONE_NO_PHOTO);
+
+        int workerID = 0, spotID = 0;
+        try
+        {
+            workerID = std::stoi(req.get_file_value("workerID").content);
+            spotID = std::stoi(req.get_file_value("spotID").content);
+        }
+        catch (const std::exception &) {}
+
+        std::string note = req.get_file_value("note").content;
+        auto photo = req.get_file_value("photo");
+        std::string photoPath = std::string(UPLOAD_DIR) + "/proof_" + std::to_string(spotID) + "_"
+                              + std::to_string(time(nullptr)) + imageExtension(photo.filename);
+
+        std::lock_guard<std::mutex> guard(spotsLock);
+
+        std::ofstream out(photoPath, std::ios::binary);
+        out << photo.content;
+        out.close();
+        if (!out)
+        {
+            remove(photoPath.c_str());
+            sendError(res, "Could not save the photo. Try again.");
+            res.status = 500;
             return;
         }
 
-        res.status = 404;
+        DoneResult result = completion.submitProof(spots, spotID, workerID, photoPath, note);
+
+        if (result != DONE_OK)
+        {
+            remove(photoPath.c_str());
+            return sendDoneError(res, result);
+        }
+
+        res.set_content(spotToJson(spots.findSpot(spotID)).dump(), "application/json");
+    });
+
+    // Sections 19 + 21: a moderator compares before/after
+    // {"moderatorID", "spotID", "action": "approve" | "reject", "reason"}
+    server.Post("/api/check", [](const httplib::Request &req, httplib::Response &res) {
+        json body;
+        if (!readBody(req, body))
+            return sendError(res, "Send the check as JSON.");
+
+        Moderator moderator(positiveField(body, "moderatorID"));
+        int spotID = positiveField(body, "spotID");
+        std::string action = textField(body, "action");
+
+        std::lock_guard<std::mutex> guard(spotsLock);
+
+        DoneResult result;
+        if (action == "approve")
+            result = completion.approve(spots, spotID, moderator);
+        else if (action == "reject")
+            result = completion.reject(spots, spotID, moderator, textField(body, "reason"));
+        else
+            return sendError(res, "Action must be approve or reject.");
+
+        if (result != DONE_OK)
+            return sendDoneError(res, result);
+
+        res.set_content(spotToJson(spots.findSpot(spotID)).dump(), "application/json");
+    });
+
+    // A worker's own jobs: ?workerID=.. Each comes with "myState":
+    // applied, not-picked, todo, redo (a moderator rejected the photo), checking, done
+    server.Get("/api/myjobs", [](const httplib::Request &req, httplib::Response &res) {
+        int workerID = 0;
+        try { workerID = std::stoi(req.get_param_value("workerID")); }
+        catch (const std::exception &) { workerID = 0; }
+
+        if (workerID < 1)
+            return sendDoneError(res, DONE_BAD_WORKER);
+
+        std::lock_guard<std::mutex> guard(spotsLock);
+
+        json list = json::array();
+        for (WasteSpot *s = spots.getHead(); s != nullptr; s = s->next)
+        {
+            bool assigned = isAssignedTo(s, workerID);
+            if (!assigned && !WorkerAssignment::hasApplied(s, workerID))
+                continue;
+
+            std::string state;
+            if (!assigned)
+                state = s->status == FUNDED ? "applied" : "not-picked";
+            else if (s->status == COMPLETED)
+                state = "done";
+            else if (s->status == SUBMITTED)
+                state = "checking";
+            else
+            {
+                const ProofRecord *p = completion.latestProof(s->spotID);
+                state = (p != nullptr && p->status == PROOF_REJECTED) ? "redo" : "todo";
+            }
+
+            json item = spotToJson(s);
+            item["myState"] = state;
+            list.push_back(item);
+        }
+
+        res.set_content(list.dump(), "application/json");
     });
 
     server.set_mount_point("/", "frontend");

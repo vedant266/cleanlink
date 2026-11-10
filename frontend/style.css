@@ -156,6 +156,26 @@ label { display: block; }
 .job .side { display: flex; align-items: center; gap: 14px; }
 .job .km { font: 700 22px var(--narrow); color: var(--mist); white-space: nowrap; }
 
+/* before / after photos of finished work */
+.ba { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ba figure { margin: 0; }
+.ba img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #222; }
+.ba figcaption { font-size: 11px; color: var(--grey); margin-top: 4px; }
+
+/* worker's "My jobs" and the proof form */
+.mine { list-style: none; padding: 0; display: grid; gap: 12px; }
+.state { display: block; margin-top: 6px; font-size: 12px; line-height: 1.4; color: var(--mist); }
+.state.wait { color: var(--grey); }
+.state.bad { color: #ff9b8a; }
+.proof { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.proof label { font-size: 11px; color: var(--grey); }
+.proof .text { display: block; width: 100%; background: none; border: 0; border-bottom: 1px solid #3a3a3a;
+               color: #fff; font: 15px var(--mono); padding: 4px 0; outline: none; }
+.proof input[type=file] { display: block; color: var(--grey); font: 12px var(--mono); margin-top: 6px; max-width: 100%; }
+.proof .note { grid-column: 1 / -1; font-size: 12px; min-height: 1.2em; color: var(--mist); }
+.proof .note.err { color: #ff9b8a; }
+.act textarea.text { resize: vertical; min-height: 54px; font-size: 14px; }
+
 /* moderator: ranked applicants (the priority queue's order) */
 .ranked { list-style: none; padding: 0; display: grid; gap: 8px; font-size: 12px; }
 .ranked li { display: grid; grid-template-columns: 22px 1fr; gap: 6px; color: var(--grey); }
@@ -177,4 +197,5 @@ label { display: block; }
   .job { grid-template-columns: 72px minmax(0, 1fr); }
   .job img { width: 72px; height: 54px; }
   .job .side { grid-column: 1 / -1; justify-content: space-between; }
+  .proof { grid-template-columns: 1fr; }
 }

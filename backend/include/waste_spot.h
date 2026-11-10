@@ -18,8 +18,13 @@ typedef enum {
     ASSIGNED,
     COMPLETED,
     // Added last so the numbers already saved in waste_spots.dat keep their meaning
-    REJECTED
+    REJECTED,
+    // Section 18: an assigned worker sent an "after" photo; waits for a moderator
+    SUBMITTED
 } SpotStatus;
+
+// The last status above, for range checks
+#define LAST_STATUS SUBMITTED
 
 #define MAX_ASSIGNED_WORKERS 20
 

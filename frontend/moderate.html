@@ -22,7 +22,8 @@
     <h1 class="title">Moderate</h1>
     <p class="lead">New reports wait here. Open the map link, check the photo shows real waste at that
        place, set the actual size, then approve or reject. You can't check your own report.
-       Once a spot is fully funded and workers have applied, assign the best of them below.</p>
+       Once a spot is fully funded and workers have applied, assign the best of them below.
+       When the workers send an "after" photo, compare it with the report photo and approve or reject.</p>
   </div>
 
   <section class="spots">
@@ -39,6 +40,22 @@
       <ul class="list" id="fundedList"></ul>
     </div>
     <div class="detail" id="fundedDetail"></div>
+  </section>
+
+  <section class="spots">
+    <h2>Finished work to check</h2>
+    <div>
+      <ul class="list" id="checkList"></ul>
+    </div>
+    <div class="detail" id="checkDetail"></div>
+  </section>
+
+  <section class="spots">
+    <h2>Cleaned spots</h2>
+    <div>
+      <ul class="list" id="doneList"></ul>
+    </div>
+    <div class="detail" id="doneDetail"></div>
   </section>
 
 </div>
@@ -127,6 +144,49 @@
                                + (n < s.workersNeeded ? ' Fewer applied than the spot needs.' : '') };
     },
   }).load();
+
+  // Sections 19 + 21: compare the report photo (before) with the worker's photo (after)
+  function checkForm(s) {
+    if (s.status !== 'Submitted') return '';
+    return `<form class="act" id="check">
+      <h3>Check the work</h3>
+      <label>Moderator ID <input class="text" name="moderatorID" type="number" min="1" placeholder="201" required></label>
+      <label>Reason, if you reject it <textarea class="text" name="reason" maxlength="190"
+        placeholder="e.g. waste still visible on the left"></textarea></label>
+      <div class="buttons">
+        <button class="btn" value="approve">Approve &rarr;</button>
+        <button class="btn ghost" value="reject">Reject</button>
+      </div>
+      <p class="note"></p>
+    </form>`;
+  }
+
+  // Both lists change when work is checked, so each reloads the other
+  const cleaned = spotBrowser({
+    listId: 'doneList', detailId: 'doneDetail',
+    filter: s => s.status === 'Completed',
+    empty: 'Nothing cleaned yet.',
+  });
+
+  spotBrowser({
+    listId: 'checkList', detailId: 'checkDetail',
+    filter: s => s.status === 'Submitted',
+    actions: checkForm,
+    empty: 'No finished work waiting. Workers send an "after" photo from the Work page.',
+    submit: async (form, spot, action) => {
+      const fd = new FormData(form);
+      action = action || 'approve';
+      const s = await post('/api/check', {
+        spotID: spot.id, moderatorID: Number(fd.get('moderatorID')), action,
+        reason: (fd.get('reason') || '').trim(),
+      });
+      cleaned.load();
+      return { id: s.id, note: action === 'approve'
+        ? `Spot #${s.id} is cleaned. It is now closed and kept in the records.`
+        : `Sent back to the workers: they will see your reason and send a new photo.` };
+    },
+  }).load();
+  cleaned.load();
 </script>
 </body>
 </html>

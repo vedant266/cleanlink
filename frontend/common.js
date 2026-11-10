@@ -13,7 +13,12 @@ const WAGE = 500;  // per worker, same as WAGE_PER_WORKER in waste_spot.h
 // Floor, so a spot never shows 100% until it is really fully funded
 const percent = s => s.cleanupCost > 0 ? Math.min(100, Math.floor(s.fundedAmount * 100 / s.cleanupCost)) : 0;
 const isOpen = s => s.status === 'Verified';
-const isFunded = s => ['Funded', 'Assigned', 'Completed'].includes(s.status);
+const isFunded = s => ['Funded', 'Assigned', 'Submitted', 'Completed'].includes(s.status);
+const isFinished = s => s.status === 'Completed';
+
+// Words shown next to a spot's bar
+const LABELS = { Submitted: 'checking', Completed: 'cleaned' };
+const label = s => LABELS[s.status] || s.status.toLowerCase();
 
 // Google Maps opens a pin at "?q=latitude,longitude"
 function mapsLink(s) {
@@ -25,9 +30,9 @@ function miniBar(s) {
   if (isOpen(s) || isFunded(s)) {
     const p = isFunded(s) ? 100 : percent(s);
     return `<span class="bar${p === 100 ? ' full' : ''}"><i style="width:${p}%"></i></span>
-            <em class="pct">${isFunded(s) ? s.status.toLowerCase() : p + '%'}</em>`;
+            <em class="pct">${isFunded(s) ? label(s) : p + '%'}</em>`;
   }
-  return `<span class="bar off"></span><em class="pct">${s.status.toLowerCase()}</em>`;
+  return `<span class="bar off"></span><em class="pct">${label(s)}</em>`;
 }
 
 // Big bar in the detail panel. "from" is the width it starts at, so it can grow after a donation.
@@ -49,7 +54,8 @@ function fundBlock(s, from) {
   }
 
   const left = s.cleanupCost - s.fundedAmount;
-  const done = { Funded: 'Fully funded. Waiting for workers.', Assigned: 'Fully funded. Workers assigned.', Completed: 'Cleaned up.' };
+  const done = { Funded: 'Fully funded. Waiting for workers.', Assigned: 'Fully funded. Workers assigned.',
+                 Submitted: 'Work finished. Waiting for a moderator to check it.', Completed: 'Cleaned up.' };
   return `<div class="fund">
     <div class="head"><b>${rs(s.fundedAmount)}</b><span>of ${rs(s.cleanupCost)} · ${p}%</span></div>
     <div class="bigbar${p === 100 ? ' full' : ''}"><i class="fill" style="width:${start}%" data-to="${p}"></i></div>
@@ -111,8 +117,17 @@ function spotBrowser({ filter = () => true, actions = () => '', onShow = null, s
     // Same spot shown again (after a donation): start the bar where it was
     const from = shownId === id ? shownPercent : null;
 
+    // Once work is sent in, show the report photo as "before" next to the worker's "after"
+    const pr = s.proof;
+    const photos = pr && (s.status === 'Submitted' || s.status === 'Completed')
+      ? `<div class="ba">
+           <figure><img src="/api/photo/${s.id}" alt=""><figcaption>Before</figcaption></figure>
+           <figure><img src="/api/proof-photo/${s.id}?t=${pr.submittedAt}" alt=""><figcaption>After</figcaption></figure>
+         </div>`
+      : `<img src="/api/photo/${s.id}" alt="">`;
+
     detail.innerHTML = `
-      <img src="/api/photo/${s.id}" alt="">
+      ${photos}
       ${fundBlock(s, from)}
       ${actions(s)}
       <dl>
@@ -126,6 +141,10 @@ function spotBrowser({ filter = () => true, actions = () => '', onShow = null, s
         ${s.moderatorID ? `<dt>Moderator</dt><dd>${s.moderatorID}</dd>` : ''}
         ${s.status === 'Funded' ? `<dt>Applicants</dt><dd>${s.applicants}</dd>` : ''}
         ${s.assignedWorkers?.length ? `<dt>Assigned</dt><dd>${s.assignedWorkers.join(', ')}</dd>` : ''}
+        ${pr ? `<dt>Work sent</dt><dd>${when(pr.submittedAt)} by worker ${pr.workerID}</dd>` : ''}
+        ${pr && pr.note ? `<dt>Worker's note</dt><dd>${esc(pr.note)}</dd>` : ''}
+        ${pr && pr.status !== 'Waiting' ? `<dt>Checked</dt><dd>${pr.status} by moderator ${pr.moderatorID}, ${when(pr.checkedAt)}</dd>` : ''}
+        ${pr && pr.status === 'Rejected' ? `<dt>Reason</dt><dd>${esc(pr.reason)}</dd>` : ''}
       </dl>`;
 
     // Grow the bar to its new width on the next frame, so the change animates

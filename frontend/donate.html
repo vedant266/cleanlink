@@ -51,8 +51,8 @@
   }
 
   spotBrowser({
-    // Raising money, or already funded (so donors can see what their money did)
-    filter: s => isOpen(s) || isFunded(s),
+    // Raising money, or funded and being cleaned. Finished spots are on the home page.
+    filter: s => isOpen(s) || (isFunded(s) && !isFinished(s)),
     actions: s => isOpen(s) ? donateForm(s) : '',
     empty: 'No verified spots yet. A moderator has to check new reports first.',
     submit: async (form, spot) => {

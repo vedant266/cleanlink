@@ -22,7 +22,9 @@
     <h1 class="title">Work</h1>
     <p class="lead">Funded cleanup jobs within 20 km of you, nearest first. Apply for the ones you can
        do; a moderator then picks the workers: the closest first, then by rating, then who applied first.
-       Each job pays Rs 500 per worker.</p>
+       Each job pays Rs 500 per worker.
+       When you finish, send an "after" photo from My jobs; a moderator checks it before the
+       spot is marked cleaned.</p>
   </div>
 
   <form class="paper short" id="find">
@@ -52,6 +54,13 @@
       <button>Find jobs &rarr;</button>
     </div>
   </form>
+
+  <section class="spots one">
+    <h2>My jobs</h2>
+    <ul class="mine" id="mine">
+      <li class="empty">Enter your worker ID to see the jobs you applied for.</li>
+    </ul>
+  </section>
 
   <section class="spots one">
     <h2>Jobs near you</h2>
@@ -139,9 +148,95 @@
       </li>`).join('');
   }
 
+  // Sections 16-18 from the worker's side: what happened to each job they applied for
+  const mine = document.getElementById('mine');
+  const ORDER = ['redo', 'todo', 'checking', 'applied', 'done', 'not-picked'];
+  const STATES = {
+    redo:         j => ['bad', `Sent back by moderator ${j.proof.moderatorID}: "${esc(j.proof.reason)}". Fix it and send a new photo.`],
+    todo:         () => ['', 'Assigned to you. Clean it up, then send an "after" photo.'],
+    checking:     j => ['wait', `Photo sent ${when(j.proof.submittedAt)}. Waiting for a moderator to check it.`],
+    applied:      () => ['wait', 'Applied. Waiting for a moderator to pick the workers.'],
+    done:         j => ['', `Done ✓ Approved ${when(j.proof.checkedAt)}.`],
+    'not-picked': () => ['wait', 'Not picked this time.'],
+  };
+
+  function proofForm(j) {
+    return `<form class="proof" data-spot="${j.id}">
+      <label>"After" photo <input type="file" name="photo" accept="image/*" capture="environment" required></label>
+      <label>Note (optional) <input class="text" name="note" maxlength="190" placeholder="e.g. 6 sacks collected"></label>
+      <button class="btn">Done ✓</button>
+      <p class="note"></p>
+    </form>`;
+  }
+
+  async function loadMine() {
+    const id = Number(find.elements.workerID.value);
+    if (!id) return;
+
+    let res, list;
+    try {
+      res = await fetch(`/api/myjobs?workerID=${id}`);
+      list = await res.json();
+    } catch {
+      mine.innerHTML = '<li class="empty">Could not reach the server. Is it running?</li>';
+      return;
+    }
+    if (!res.ok) { mine.innerHTML = `<li class="empty">${esc(list.error)}</li>`; return; }
+    if (!list.length) { mine.innerHTML = '<li class="empty">You have not applied for any jobs yet.</li>'; return; }
+
+    list.sort((a, b) => ORDER.indexOf(a.myState) - ORDER.indexOf(b.myState));
+    mine.innerHTML = list.map(j => {
+      const [kind, text] = STATES[j.myState](j);
+      const photo = (j.myState === 'checking' || j.myState === 'done') ? `/api/proof-photo/${j.id}` : `/api/photo/${j.id}`;
+      return `<li class="job">
+        <img src="${photo}" alt="">
+        <div>
+          <b>#${j.id} ${esc(j.wasteType)} <small>(${j.size.toLowerCase()})</small></b>
+          <em>${esc(j.city)}, ${esc(j.locality)} · <a href="${mapsLink(j)}" target="_blank">map ↗</a></em>
+          <span class="state ${kind}">${text}</span>
+        </div>
+        <div class="side"></div>
+        ${j.myState === 'todo' || j.myState === 'redo' ? proofForm(j) : ''}
+      </li>`;
+    }).join('');
+  }
+
+  // Section 18: send the "after" photo
+  mine.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const note = form.querySelector('.note');
+    const button = form.querySelector('button');
+    const data = new FormData(form);
+    data.append('workerID', find.elements.workerID.value);
+    data.append('spotID', form.dataset.spot);
+
+    button.disabled = true;
+    note.classList.remove('err');
+    note.textContent = 'Sending…';
+
+    try {
+      let res;
+      try {
+        res = await fetch('/api/proof', { method: 'POST', body: data });
+      } catch {
+        throw new Error('Could not reach the server. Is it running?');
+      }
+      const reply = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(reply.error || 'Something went wrong.');
+      msg.textContent = `Sent your "after" photo for spot #${reply.id}. A moderator will check it.`;
+      await loadMine();
+    } catch (err) {
+      note.textContent = err.message;
+      note.classList.add('err');
+      button.disabled = false;
+    }
+  });
+
   find.addEventListener('submit', (e) => {
     e.preventDefault();
     loadJobs();
+    loadMine();
   });
 
   jobsList.addEventListener('click', async (e) => {
@@ -152,6 +247,7 @@
     try {
       const s = await post('/api/apply', { ...worker(), spotID: Number(button.dataset.apply) });
       await loadJobs(`Applied for spot #${s.id} (${s.distanceKm.toFixed(1)} km away). A moderator picks the workers.`);
+      loadMine();
     } catch (err) {
       msg.textContent = err.message;
       button.disabled = false;
@@ -160,6 +256,7 @@
   });
 
   // Came back with a saved ID and location: show the jobs straight away
+  if (saved.workerID) loadMine();
   if (saved.workerID && saved.latitude && saved.longitude) loadJobs();
 </script>
 </body>

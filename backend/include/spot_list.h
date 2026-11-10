@@ -6,6 +6,9 @@
 // Path is relative to the repo root (run.command starts the app from there)
 #define SPOT_FILE "backend/data/waste_spots.dat"
 
+// "Pending", "Verified", ... for a status (shared by the terminal and web)
+const char *statusName(SpotStatus status);
+
 class SpotList
 {
 private:
