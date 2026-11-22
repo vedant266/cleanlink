@@ -1,11 +1,12 @@
+
 #ifndef CITY_HASH_H
 #define CITY_HASH_H
 
 #include <string>
 #include "locality_hash.h"
-using namespace std;
+#include "chained_hash.h"
 
-const int CITY_SIZE = 10;
+using namespace std;
 
 struct City
 {
@@ -19,15 +20,19 @@ struct City
 class CityHashTable
 {
 private:
-    City table[CITY_SIZE];//array
+    // Separate Chaining instead of the old array
+    ChainedHashTable<City*> table;
+
     int nextCityID;
 
 public:
-    CityHashTable(); //constructor insialises all the slot
+    CityHashTable();  // Constructor
 
-    int hashFunction(string name);//adds up the character codes of city
+    ~CityHashTable(); // Destructor
 
-    // Adds the city if it is new. Returns nullptr if the table is full.
+    int hashFunction(string name);
+
+    // Adds the city if it is new
     City* insertCity(string name);
 
     int searchCity(string name);
@@ -36,12 +41,10 @@ public:
 
     int getCityID(string name);
 
-    // Adds the locality into that city's own locality table.
-    // The city is added first if it is new. Returns nullptr if a table is full.
+    // Adds locality inside the respective city
     Locality* addLocality(string cityName, string localityName);
 
-    // Put a spot into its city -> locality -> that locality's spot list.
-    // Spots with no real city ("Unknown") are skipped.
+    // Adds waste spot inside its city and locality
     void addSpot(WasteSpot* spot);
 
     void display();
