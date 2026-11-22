@@ -2,56 +2,59 @@
 #include <cstring>
 #include "city_hash.h"
 #include "waste_spot.h"
+#include "chained_hash.h"
+
 
 using namespace std;
 
+// Constructor
 CityHashTable::CityHashTable()
 {
     nextCityID = 1;
-
-    for(int i = 0; i < CITY_SIZE; i++)
-    {
-        table[i].id = 0;
-        table[i].name = "";
-    }
 }
 
+// Destructor
+CityHashTable::~CityHashTable()
+{
+    // Delete all dynamically created City objects
+    table.forEach([](City* city)
+    {
+        delete city;
+    });
+}
+
+// DJB2 hash function
 int CityHashTable::hashFunction(string name)
 {
-    int sum = 0;
+    unsigned long hash = 5381;
 
-    // unsigned char so names like "Haridwār" never give a negative sum
-    for(int i = 0; i < name.length(); i++)
-        sum += (unsigned char)name[i];
+    for(unsigned char c : name)
+        hash = hash * 33 + c;
 
-    return sum % CITY_SIZE;
+    return hash % 101;
 }
 
+// Insert a new city
 City* CityHashTable::insertCity(string name)
 {
-    // Check if city already exists
-    int found = searchCity(name);
+    // Check whether the city already exists
+    City* existingCity = getCity(name);
 
-    if(found != -1)
-        return &table[found];
+    if(existingCity != nullptr)
+        return existingCity;
 
-    int index = hashFunction(name);
-    int startIndex = index;
+    // Create a new city dynamically
+    City* city = new City;
 
-    while(table[index].id != 0)
+    city->id = nextCityID;
+    city->name = name;
+
+    // Insert city into the chained hash table
+    if(!table.insert(name, city))
     {
-        index = (index + 1) % CITY_SIZE;
-
-        // Every slot is taken
-        if(index == startIndex)
-        {
-            cout << "City Hash Table is Full\n";
-            return nullptr;
-        }
+        delete city;
+        return nullptr;
     }
-
-    table[index].id = nextCityID;
-    table[index].name = name;
 
     cout << "City added: "
          << name
@@ -61,49 +64,43 @@ City* CityHashTable::insertCity(string name)
 
     nextCityID++;
 
-    return &table[index];
+    return city;
 }
 
+// Search city and return its ID
 int CityHashTable::searchCity(string name)
 {
-    int index = hashFunction(name);
-    int startIndex = index;
+    City* city = getCity(name);
 
-    while(table[index].id != 0)
-    {
-        if(table[index].name == name)
-            return index;
-
-        index = (index + 1) % CITY_SIZE; //linear probing
-
-        // Prevent infinite loop if table is full
-        if(index == startIndex)
-            break;
-    }
+    if(city != nullptr)
+        return city->id;
 
     return -1;
 }
 
+// Get city object
 City* CityHashTable::getCity(string name)
 {
-    int index = searchCity(name);
+    City** found = table.find(name);
 
-    if(index != -1)
-        return &table[index];
+    if(found != nullptr)
+        return *found;
 
     return nullptr;
 }
 
+// Get city ID
 int CityHashTable::getCityID(string name)
 {
-    int index = searchCity(name);
+    City* city = getCity(name);
 
-    if(index != -1)
-        return table[index].id;
+    if(city != nullptr)
+        return city->id;
 
     return -1;
 }
 
+// Add locality inside a city
 Locality* CityHashTable::addLocality(string cityName, string localityName)
 {
     City* city = getCity(cityName);
@@ -114,15 +111,20 @@ Locality* CityHashTable::addLocality(string cityName, string localityName)
     if(city == nullptr)
         return nullptr;
 
-    return city->localities.insertLocality(localityName);//into this city table
+    return city->localities.insertLocality(localityName);
 }
 
+// Add waste spot
 void CityHashTable::addSpot(WasteSpot* spot)
 {
-    if(spot->cityName[0] == '\0' || strcmp(spot->cityName, "Unknown") == 0)
+    if(spot == nullptr)
         return;
 
-    // Old spots may have no locality saved, so use the city name instead
+    if(spot->cityName[0] == '\0' ||
+       strcmp(spot->cityName, "Unknown") == 0)
+        return;
+
+    // Use city name if locality name is missing
     string localityName = spot->localityName;
 
     if(localityName.empty())
@@ -131,28 +133,29 @@ void CityHashTable::addSpot(WasteSpot* spot)
     Locality* locality = addLocality(spot->cityName, localityName);
 
     if(locality == nullptr)
-        return; // a table is full
+        return;
 
-    getCity(spot->cityName)->localities.addSpot(locality, spot);
+    City* city = getCity(spot->cityName);
+
+    if(city != nullptr)
+        city->localities.addSpot(locality, spot);
 }
 
+// Display all cities
 void CityHashTable::display()
 {
     cout << "\nCITY HASH TABLE\n";
 
-    for(int i = 0; i < CITY_SIZE; i++)
+    table.forEach([](City* city)
     {
-        if(table[i].id != 0)
-        {
-            cout << i << " : "
-                 << table[i].id
-                 << " - "
-                 << table[i].name
-                 << " | localities: "
-                 << table[i].localities.count()
-                 << endl;
+        cout << "ID: "
+             << city->id
+             << " - "
+             << city->name
+             << " | localities: "
+             << city->localities.count()
+             << endl;
 
-            table[i].localities.display();
-        }
-    }
+        city->localities.display();
+    });
 }
