@@ -5,7 +5,7 @@
 #include <string>
 using namespace std;
 
-const int LOCALITY_SIZE = 10;
+const int LOCALITY_SIZE = 101;
 
 struct WasteSpot;
 
