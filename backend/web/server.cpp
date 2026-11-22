@@ -332,6 +332,40 @@ void sendDoneError(httplib::Response &res, DoneResult result)
         res.status = 500;
 }
 
+// Moderators are made in the terminal app (menu option 11), but a host like Render
+// has no terminal and starts with an empty users.dat after every deploy. So when
+// MODERATOR_USERNAME and MODERATOR_PASSWORD are set (Render: Environment tab),
+// make that moderator at start-up. The password stays in the host's settings,
+// never in the code or on GitHub. Call before the server starts taking requests.
+void createModeratorFromEnv()
+{
+    const char *name = getenv("MODERATOR_USERNAME");
+    const char *password = getenv("MODERATOR_PASSWORD");
+    if (name == nullptr || password == nullptr)
+        return;
+
+    User *created;
+    UserResult result = users.signUp(name, password, "moderator", created);
+
+    if (result == USER_OK)
+    {
+        std::cout << "Moderator " << created->getUsername() << " created with ID "
+                  << created->getID() << " (from MODERATOR_USERNAME)" << std::endl;
+        return;
+    }
+
+    // Saved by an earlier start (data kept): fine if it is a moderator with this password
+    if (result == USER_NAME_TAKEN)
+    {
+        if (dynamic_cast<Moderator *>(users.logIn(name, password)) == nullptr)
+            std::cerr << "MODERATOR_USERNAME \"" << name << "\" belongs to another account,"
+                      << " or MODERATOR_PASSWORD does not match it. No moderator was made.\n";
+        return;
+    }
+
+    std::cerr << "Moderator not created: " << UserTable::resultMessage(result) << "\n";
+}
+
 int main(int argc, char *argv[])
 {
     // Run from the repo folder so frontend/, uploads/ and the .dat file are found
@@ -354,6 +388,7 @@ int main(int argc, char *argv[])
     completion.loadFromFile();
 
     users.loadFromFile();
+    createModeratorFromEnv();
 
     httplib::Server server;
 
