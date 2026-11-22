@@ -67,17 +67,6 @@ City* CityHashTable::insertCity(string name)
     return city;
 }
 
-// Search city and return its ID
-int CityHashTable::searchCity(string name)
-{
-    City* city = getCity(name);
-
-    if(city != nullptr)
-        return city->id;
-
-    return -1;
-}
-
 // Get city object
 City* CityHashTable::getCity(string name)
 {
